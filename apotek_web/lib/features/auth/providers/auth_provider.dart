@@ -8,22 +8,26 @@ import '../../../shared/models/user_model.dart';
 class AuthState {
   final bool isLoading;
   final UserModel? user;
+  final String? token;
   final String? error;
 
   AuthState({
     this.isLoading = false,
     this.user,
+    this.token,
     this.error,
   });
 
   AuthState copyWith({
     bool? isLoading,
     UserModel? user,
+    String? token,
     String? error,
   }) {
     return AuthState(
       isLoading: isLoading ?? this.isLoading,
       user: user ?? this.user,
+      token: token ?? this.token,
       error: error,
     );
   }
@@ -62,7 +66,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       // Simpan token & data user
       await _storage.write(key: 'access_token', value: token);
 
-      state = state.copyWith(isLoading: false, user: user);
+      state = state.copyWith(isLoading: false, user: user, token: token);
       return true;
     } on DioException catch (e) {
       final message = e.response?.data['message'] ?? 'Login gagal';
