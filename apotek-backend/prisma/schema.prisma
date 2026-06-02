@@ -1,0 +1,204 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================
+// TABEL PENGGUNA
+// ==================
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  password     String
+  role         Role     @default(KASIR)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  transactions Transaction[]
+  orders       Order[]
+  ocrScans     OcrScan[]
+}
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  APOTEKER
+  KASIR
+  PASIEN
+}
+
+// ==================
+// TABEL OBAT
+// ==================
+model Drug {
+  id              String      @id @default(uuid())
+  name            String
+  genericName     String?
+  brandName       String?
+  activeIngredient String?
+  category        DrugCategory @default(BEBAS)
+  type            DrugType     @default(GENERIK)
+  unit            String       @default("tablet")
+  minStock        Int          @default(10)
+  sellPrice       Float
+  buyPrice        Float
+  rxcui           String?
+  bpomNumber      String?
+  description     String?
+  isActive        Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  batches          DrugBatch[]
+  transactionItems TransactionItem[]
+  orderItems       OrderItem[]
+}
+
+enum DrugCategory {
+  BEBAS
+  BEBAS_TERBATAS
+  KERAS
+  NARKOTIKA
+  PSIKOTROPIKA
+}
+
+enum DrugType {
+  GENERIK
+  PATEN
+  BPJS
+}
+
+// ==================
+// TABEL STOK / BATCH
+// ==================
+model DrugBatch {
+  id           String    @id @default(uuid())
+  drugId       String
+  drug         Drug      @relation(fields: [drugId], references: [id])
+  batchNumber  String
+  stock        Int
+  buyPrice     Float
+  expiredDate  DateTime
+  receivedDate DateTime  @default(now())
+  supplierId   String?
+  supplier     Supplier? @relation(fields: [supplierId], references: [id])
+  createdAt    DateTime  @default(now())
+
+  transactionItems TransactionItem[]
+}
+
+// ==================
+// TABEL SUPPLIER
+// ==================
+model Supplier {
+  id        String      @id @default(uuid())
+  name      String
+  phone     String?
+  email     String?
+  address   String?
+  createdAt DateTime    @default(now())
+
+  batches   DrugBatch[]
+}
+
+// ==================
+// TABEL TRANSAKSI (KASIR)
+// ==================
+model Transaction {
+  id            String        @id @default(uuid())
+  cashierId     String
+  cashier       User          @relation(fields: [cashierId], references: [id])
+  totalAmount   Float
+  paymentMethod PaymentMethod @default(CASH)
+  amountPaid    Float
+  change        Float         @default(0)
+  status        TxStatus      @default(COMPLETED)
+  notes         String?
+  createdAt     DateTime      @default(now())
+
+  items TransactionItem[]
+}
+
+enum PaymentMethod {
+  CASH
+  TRANSFER
+  QRIS
+  DEBIT
+  CREDIT
+}
+
+enum TxStatus {
+  COMPLETED
+  CANCELLED
+  REFUNDED
+}
+
+model TransactionItem {
+  id            String      @id @default(uuid())
+  transactionId String
+  transaction   Transaction @relation(fields: [transactionId], references: [id])
+  drugId        String
+  drug          Drug        @relation(fields: [drugId], references: [id])
+  batchId       String
+  batch         DrugBatch   @relation(fields: [batchId], references: [id])
+  quantity      Int
+  sellPrice     Float
+  subtotal      Float
+}
+
+// ==================
+// TABEL ORDER (PASIEN)
+// ==================
+model Order {
+  id          String      @id @default(uuid())
+  patientId   String
+  patient     User        @relation(fields: [patientId], references: [id])
+  totalAmount Float
+  status      OrderStatus @default(PENDING)
+  orderCode   String      @unique
+  paymentProof String?
+  notes       String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  items OrderItem[]
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  READY
+  COMPLETED
+  CANCELLED
+}
+
+model OrderItem {
+  id       String @id @default(uuid())
+  orderId  String
+  order    Order  @relation(fields: [orderId], references: [id])
+  drugId   String
+  drug     Drug   @relation(fields: [drugId], references: [id])
+  quantity Int
+  price    Float
+  subtotal Float
+}
+
+// ==================
+// TABEL OCR SCAN
+// ==================
+model OcrScan {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  imageUrl   String?
+  rawText    String?
+  parsedDrugs Json?
+  createdAt  DateTime @default(now())
+}
