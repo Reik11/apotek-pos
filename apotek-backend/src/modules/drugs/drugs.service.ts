@@ -81,13 +81,13 @@ export class DrugsService {
 
   // TAMBAH STOK / BATCH BARU
   async addBatch(data: {
-  drugId: string;
-  batchNumber: string;
-  stock: number;
-  buyPrice: number;
-  expiredDate: string;
-  supplierId?: string;
-}) {
+    drugId: string;
+    batchNumber: string;
+    stock: number;
+    buyPrice: number;
+    expiredDate: string;
+    supplierId?: string;
+  }) {
   await this.findOne(data.drugId);
   return this.prisma.drugBatch.create({
     data: {

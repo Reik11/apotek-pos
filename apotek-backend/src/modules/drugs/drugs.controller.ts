@@ -1,5 +1,5 @@
 import {
-  Controller, Get, Post, Put, Delete,
+  Controller, Get, Post, Put, Patch, Delete,
   Body, Param, Query, UseGuards,
 } from '@nestjs/common';
 import { DrugsService } from './drugs.service';
@@ -35,7 +35,7 @@ export class DrugsController {
     return this.drugsService.create(body);
   }
 
-  @Put(':id')
+ @Patch(':id')  // ← dari @Put menjadi @Patch
   update(@Param('id') id: string, @Body() body: any) {
     return this.drugsService.update(id, body);
   }

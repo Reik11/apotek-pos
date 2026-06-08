@@ -37,7 +37,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         );
 
     if (success && mounted) {
-      context.go('/dashboard');
+      final user = ref.read(authProvider).user;
+      final role = user?.role ?? '';
+
+      // Redirect berdasarkan role
+      if (role == 'PASIEN') {
+        context.go('/pasien');
+      } else if (role == 'APOTEKER') {
+        context.go('/apoteker');
+      } else {
+        // Admin, Kasir, Super Admin → ke web dashboard
+        context.go('/dashboard');
+      }
     }
   }
 

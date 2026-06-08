@@ -118,7 +118,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
                         : _buildDrugTable(inventoryState.filteredDrugs),
 
                 // Tab 2 — Hampir expired
-                _ExpiringDrugsTab(),
+                const _ExpiringDrugsTab(),
               ],
             ),
           ),
