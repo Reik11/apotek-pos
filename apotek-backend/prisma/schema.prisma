@@ -51,6 +51,14 @@ model Drug {
   rxcui           String?
   bpomNumber      String?
   description     String?
+  rxnormName           String?
+  rxnormIngredients    String?
+  fdaIndications       String?
+  fdaSideEffects       String?
+  fdaDosage            String?
+  fdaWarnings          String?
+  fdaContraindications String?
+  lastApiSync          DateTime?
   isActive        Boolean      @default(true)
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt

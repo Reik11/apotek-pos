@@ -1,11 +1,14 @@
 import { Module } from '@nestjs/common';
+import { ScheduleModule } from '@nestjs/schedule';
 import { RxNormService } from './rxnorm.service';
 import { FdaService } from './fda.service';
 import { ExternalController } from './external.controller';
+import { DrugSyncService } from './drug-sync.service';
 
 @Module({
-  providers: [RxNormService, FdaService],
+  imports: [ScheduleModule.forRoot()],
+  providers: [RxNormService, FdaService, DrugSyncService],
   controllers: [ExternalController],
-  exports: [RxNormService, FdaService],
+  exports: [RxNormService, FdaService, DrugSyncService],
 })
 export class ExternalModule {}

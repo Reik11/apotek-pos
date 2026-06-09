@@ -36,14 +36,32 @@ export class DrugsService {
     const drug = await this.prisma.drug.findUnique({
       where: { id },
       include: {
-        batches: {
-          orderBy: { expiredDate: 'asc' },
-        },
+        batches: { orderBy: { expiredDate: 'asc' } },
       },
-    });
-    if (!drug) throw new NotFoundException('Obat tidak ditemukan');
-    return drug;
-  }
+  });
+  if (!drug) throw new NotFoundException('Obat tidak ditemukan');
+
+  // Hitung apakah data sudah stale (lebih dari 7 hari)
+  const isStale = drug.lastApiSync
+    ? new Date().getTime() - drug.lastApiSync.getTime() >
+      7 * 24 * 60 * 60 * 1000
+    : true;
+
+  return {
+    ...drug,
+    apiDataAvailable: drug.lastApiSync !== null,
+    apiDataStale: isStale,
+    fdaInfo: drug.lastApiSync
+      ? {
+          indications: drug.fdaIndications,
+          sideEffects: drug.fdaSideEffects,
+          dosage: drug.fdaDosage,
+          warnings: drug.fdaWarnings,
+          contraindications: drug.fdaContraindications,
+        }
+      : null,
+  };
+}
 
   // TAMBAH OBAT BARU
   async create(data: {
