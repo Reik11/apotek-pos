@@ -2,7 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class ApiClient {
-  static const String baseUrl = 'http://localhost:3000';
+  static const String baseUrl = 'https://apotek-backend.onrender.com';
   static final FlutterSecureStorage _storage = FlutterSecureStorage();
 
   static Dio createDio() {

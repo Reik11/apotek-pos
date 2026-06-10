@@ -1,0 +1,7 @@
+[build]
+  base = "apotek_web"
+  command = "bash netlify-build.sh"
+  publish = "apotek_web/build/web"
+
+[build.environment]
+  FLUTTER_VERSION = "3.41.6"
