@@ -803,35 +803,46 @@ class _InfoSection extends StatelessWidget {
 // Widget badge kategori
 class _CategoryBadge extends StatelessWidget {
   final String category;
-
   const _CategoryBadge({required this.category});
 
   @override
   Widget build(BuildContext context) {
     Color color;
+    String label;
+
     switch (category) {
       case 'KERAS':
         color = AppTheme.danger;
+        label = 'Keras';
         break;
       case 'BEBAS_TERBATAS':
         color = AppTheme.warning;
+        label = 'Bebas Terbatas';
         break;
       case 'NARKOTIKA':
-        color = Colors.purple;
+        color = const Color(0xFF7C3AED); // violet
+        label = 'Narkotika';
         break;
-      default:
+      case 'PSIKOTROPIKA':
+        color = const Color(0xFF7C3AED);
+        label = 'Psikotropika';
+        break;
+      default: // BEBAS
         color = AppTheme.success;
+        label = 'Bebas';
     }
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withOpacity(0.08),
         borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border(
+          left: BorderSide(color: color, width: 3), // ← left-border saja
+        ),
       ),
       child: Text(
-        category,
+        label, // ← label lebih rapi (bukan ALL_CAPS)
         style: TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w600,

@@ -40,186 +40,368 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       final user = ref.read(authProvider).user;
       final role = user?.role ?? '';
 
-      // Redirect berdasarkan role
       if (role == 'PASIEN') {
         context.go('/pasien');
       } else if (role == 'APOTEKER') {
         context.go('/apoteker');
       } else {
-        // Admin, Kasir, Super Admin → ke web dashboard
         context.go('/dashboard');
       }
     }
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+    BuildContext context,
+  ) {
     final authState = ref.watch(authProvider);
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
 
     return Scaffold(
       backgroundColor: AppTheme.background,
-      body: Center(
-        child: SingleChildScrollView(
-          child: Row(
-            children: [
-              // Sisi kiri — ilustrasi
-              Expanded(
-                flex: 5,
-                child: Container(
-                  height: MediaQuery.of(context).size.height,
-                  color: AppTheme.primary,
-                  child: const Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.local_pharmacy,
-                          size: 100, color: Colors.white),
-                      SizedBox(height: 24),
-                      Text(
-                        'ApotekPOS',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 40,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      SizedBox(height: 12),
-                      Text(
-                        'Sistem Manajemen Apotek\nTerintegrasi',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ],
-                  ),
+      body:
+          isMobile ? _buildMobileLayout(authState) : _buildWebLayout(authState),
+    );
+  }
+
+  // ===== WEB LAYOUT =====
+  Widget _buildWebLayout(AuthState authState) {
+    return Row(
+      children: [
+        // KIRI — Branding Panel
+        Expanded(
+          flex: 5,
+          child: Container(
+            decoration: const BoxDecoration(gradient: AppTheme.primaryGradient),
+            child: Stack(
+              children: [
+                // Dekorasi lingkaran
+                Positioned(
+                  top: -80,
+                  right: -80,
+                  child: _decorCircle(240, Colors.white.withOpacity(0.05)),
                 ),
-              ),
-
-              // Sisi kanan — form login
-              Expanded(
-                flex: 4,
-                child: Padding(
-                  padding: const EdgeInsets.all(48.0),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Selamat Datang',
-                        style: TextStyle(
-                          fontSize: 32,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Masuk ke akun Anda',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: AppTheme.textSecondary,
-                        ),
-                      ),
-                      const SizedBox(height: 48),
-
-                      // Email field
-                      const Text('Email',
-                          style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: AppTheme.textPrimary)),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: _emailController,
-                        keyboardType: TextInputType.emailAddress,
-                        decoration: const InputDecoration(
-                          hintText: 'contoh@apotek.com',
-                          prefixIcon: Icon(Icons.email_outlined),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-
-                      // Password field
-                      const Text('Password',
-                          style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: AppTheme.textPrimary)),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: _passwordController,
-                        obscureText: _obscurePassword,
-                        onSubmitted: (_) => _handleLogin(),
-                        decoration: InputDecoration(
-                          hintText: '••••••••',
-                          prefixIcon: const Icon(Icons.lock_outlined),
-                          suffixIcon: IconButton(
-                            icon: Icon(_obscurePassword
-                                ? Icons.visibility_outlined
-                                : Icons.visibility_off_outlined),
-                            onPressed: () => setState(
-                                () => _obscurePassword = !_obscurePassword),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Error message
-                      if (authState.error != null)
+                Positioned(
+                  bottom: -60,
+                  left: -60,
+                  child: _decorCircle(200, Colors.white.withOpacity(0.07)),
+                ),
+                Positioned(
+                  top: 100,
+                  left: -40,
+                  child: _decorCircle(120, Colors.white.withOpacity(0.04)),
+                ),
+                // Konten branding
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(48),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                         Container(
-                          padding: const EdgeInsets.all(12),
+                          width: 64,
+                          height: 64,
                           decoration: BoxDecoration(
-                            color: AppTheme.danger.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                                color: AppTheme.danger.withOpacity(0.3)),
+                            color: Colors.white.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(18),
                           ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.error_outline,
-                                  color: AppTheme.danger, size: 18),
-                              const SizedBox(width: 8),
-                              Text(
-                                authState.error!,
-                                style: const TextStyle(
-                                    color: AppTheme.danger, fontSize: 14),
-                              ),
-                            ],
+                          child: const Icon(
+                            Icons.local_pharmacy_rounded,
+                            color: Colors.white,
+                            size: 36,
                           ),
                         ),
-
-                      const SizedBox(height: 32),
-
-                      // Tombol login
-                      SizedBox(
-                        width: double.infinity,
-                        height: 50,
-                        child: ElevatedButton(
-                          onPressed: authState.isLoading ? null : _handleLogin,
-                          child: authState.isLoading
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Text(
-                                  'Masuk',
-                                  style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold),
-                                ),
+                        const SizedBox(height: 32),
+                        const Text(
+                          'ApotekPOS',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 36,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.5,
+                          ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 12),
+                        Text(
+                          'Sistem Manajemen Apotek\nTerintegrasi & Modern',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.85),
+                            fontSize: 18,
+                            height: 1.5,
+                          ),
+                        ),
+                        const SizedBox(height: 40),
+                        ..._buildFeatureBullets(),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
+
+        // KANAN — Form Login
+        Expanded(
+          flex: 4,
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(48),
+              child: _buildLoginForm(authState),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ===== MOBILE LAYOUT =====
+  Widget _buildMobileLayout(AuthState authState) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        children: [
+          const SizedBox(height: 60),
+          Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              gradient: AppTheme.primaryGradient,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: const Icon(
+              Icons.local_pharmacy_rounded,
+              color: Colors.white,
+              size: 40,
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'ApotekPOS',
+            style: TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Sistem Manajemen Apotek Terintegrasi',
+            style: TextStyle(
+              fontSize: 13,
+              color: AppTheme.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 40),
+          _buildLoginForm(authState),
+          const SizedBox(height: 24),
+          // Info role khusus mobile
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppTheme.primary.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppTheme.primary.withOpacity(0.1)),
+            ),
+            child: const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Info Login:',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                    color: AppTheme.primary,
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  '• Apoteker & Pasien → App Mobile',
+                  style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                ),
+                Text(
+                  '• Admin & Kasir → Gunakan Web Browser',
+                  style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
+    );
+  }
+
+  // ===== FORM LOGIN =====
+  Widget _buildLoginForm(AuthState authState) {
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 400),
+      padding: const EdgeInsets.all(32),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(AppTheme.radiusXL),
+        border: Border.all(color: AppTheme.border),
+        boxShadow: AppTheme.shadowCard,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Selamat Datang 👋',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Masukkan akun Anda untuk melanjutkan',
+            style: TextStyle(fontSize: 14, color: AppTheme.textSecondary),
+          ),
+          const SizedBox(height: 28),
+
+          // Email Field
+          const Text(
+            'Email',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: AppTheme.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 6),
+          TextField(
+            controller: _emailController,
+            keyboardType: TextInputType.emailAddress,
+            decoration: const InputDecoration(
+              hintText: 'contoh@apotek.com',
+              prefixIcon: Icon(Icons.email_outlined, size: 18),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Password Field
+          const Text(
+            'Password',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: AppTheme.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 6),
+          TextField(
+            controller: _passwordController,
+            obscureText: _obscurePassword,
+            onSubmitted: (_) => _handleLogin(),
+            decoration: InputDecoration(
+              hintText: '••••••••',
+              prefixIcon: const Icon(Icons.lock_outline, size: 18),
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _obscurePassword
+                      ? Icons.visibility_outlined
+                      : Icons.visibility_off_outlined,
+                  size: 18,
+                ),
+                onPressed: () =>
+                    setState(() => _obscurePassword = !_obscurePassword),
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Tombol Login
+          if (authState.isLoading)
+            const Center(child: CircularProgressIndicator())
+          else
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                onPressed: _handleLogin,
+                child: const Text(
+                  'Masuk',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
+
+          // Error
+          if (authState.error != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppTheme.danger.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
+                border: Border.all(color: AppTheme.danger.withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.error_outline,
+                      color: AppTheme.danger, size: 16),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      authState.error!,
+                      style:
+                          const TextStyle(color: AppTheme.danger, fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // ===== HELPER WIDGETS =====
+  List<Widget> _buildFeatureBullets() {
+    final features = [
+      '💊 Manajemen inventaris dengan FIFO',
+      '🧾 Kasir POS dengan struk digital',
+      '📱 Pemesanan online pasien',
+      '🔬 OCR resep dokter otomatis',
+    ];
+    return features
+        .map(
+          (f) => Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Row(
+              children: [
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: const BoxDecoration(
+                    color: AppTheme.accent,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  f,
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.85),
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        )
+        .toList();
+  }
+
+  Widget _decorCircle(double size, Color color) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
     );
   }
 }

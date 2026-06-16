@@ -6,6 +6,7 @@ import '../../../../core/api/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../features/auth/providers/auth_provider.dart';
 import '../../ocr/screens/ocr_screen.dart';
+import '../../profile/profile_screen.dart';
 
 class ApotekerHomeScreen extends ConsumerStatefulWidget {
   const ApotekerHomeScreen({super.key});
@@ -14,72 +15,141 @@ class ApotekerHomeScreen extends ConsumerStatefulWidget {
   ConsumerState<ApotekerHomeScreen> createState() => _ApotekerHomeScreenState();
 }
 
-class _ApotekerHomeScreenState extends ConsumerState<ApotekerHomeScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _ApotekerHomeScreenState extends ConsumerState<ApotekerHomeScreen> {
   final currency =
       NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
-
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 3, vsync: this);
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
+      
+  int _currentIndex = 0;
 
   @override
   Widget build(BuildContext context) {
-    final authState = ref.watch(authProvider);
+    final user = ref.watch(authProvider).user;
+    
+    final List<Widget> pages = [
+      _ApotekerDashboard(currency: currency),
+      _OrdersTab(currency: currency),
+      _StokTab(currency: currency),
+      const ProfileScreen(isFromBottomNav: true),
+    ];
 
     return Scaffold(
-      backgroundColor: AppTheme.background,
-      appBar: AppBar(
-        title: const Text('ApotekPOS — Apoteker'),
-        backgroundColor: AppTheme.primary,
-        foregroundColor: Colors.white,
-        actions: [
-          // Di dalam AppBar actions, tambahkan sebelum IconButton logout:
-          IconButton(
-            icon: const Icon(Icons.document_scanner),
-            tooltip: 'Scan Resep',
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const OcrScreen(),
-              ),
+      backgroundColor: Colors.grey.shade100, // Background luar untuk Web
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 600),
+          child: Container(
+            color: AppTheme.background,
+            child: Column(
+              children: [
+                _buildHeader(user?.name ?? 'Apoteker'),
+                Expanded(
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 300),
+                    child: pages[_currentIndex],
+                  ),
+                ),
+                _buildBottomNav(),
+              ],
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () async {
-              await ref.read(authProvider.notifier).logout();
-              if (mounted) context.go('/login');
-            },
-          ),
-        ],
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: Colors.white,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white60,
-          tabs: const [
-            Tab(icon: Icon(Icons.dashboard), text: 'Dashboard'),
-            Tab(icon: Icon(Icons.shopping_bag), text: 'Orders'),
-            Tab(icon: Icon(Icons.inventory), text: 'Stok'),
-          ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
+      // Floating Action Button khusus untuk tab pertama jika ingin fitur OCR cepat
+      floatingActionButton: _currentIndex == 0 ? FloatingActionButton(
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const OcrScreen()),
+        ),
+        backgroundColor: AppTheme.primary,
+        child: const Icon(Icons.document_scanner, color: Colors.white),
+      ) : null,
+    );
+  }
+
+  Widget _buildHeader(String userName) {
+    return Container(
+      padding: EdgeInsets.only(
+        top: MediaQuery.of(context).padding.top + 24,
+        left: 24,
+        right: 24,
+        bottom: 24,
+      ),
+      decoration: const BoxDecoration(
+        color: AppTheme.primary,
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(32),
+          bottomRight: Radius.circular(32),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          _ApotekerDashboard(currency: currency),
-          _OrdersTab(currency: currency),
-          _StokTab(currency: currency),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Halo, $userName 👋',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Siap melayani hari ini?',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBottomNav() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 20,
+            offset: const Offset(0, -5),
+          ),
+        ],
+      ),
+      child: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        onTap: (index) => setState(() => _currentIndex = index),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        selectedItemColor: AppTheme.primary,
+        unselectedItemColor: Colors.grey.shade400,
+        showUnselectedLabels: true,
+        type: BottomNavigationBarType.fixed,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.dashboard_rounded),
+            label: 'Dashboard',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.shopping_bag_rounded),
+            label: 'Orders',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.inventory_2_rounded),
+            label: 'Stok Obat',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person_outline_rounded),
+            label: 'Profil',
+          ),
         ],
       ),
     );
@@ -106,78 +176,61 @@ class _ApotekerDashboard extends ConsumerWidget {
         }
 
         return SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Greeting
-              Text(
-                'Selamat Datang, Apoteker!',
+              const Text(
+                'Ringkasan Hari Ini',
                 style: TextStyle(
-                  fontSize: 20,
+                  fontSize: 18,
                   fontWeight: FontWeight.bold,
                   color: AppTheme.textPrimary,
                 ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                'Pantau stok dan order hari ini',
-                style: TextStyle(color: AppTheme.textSecondary),
-              ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
 
-              // Alert cards
-              _AlertCard(
-                icon: Icons.pending_actions,
-                title: 'Order Menunggu',
-                value: '${data['alerts']['pendingOrders']}',
-                color: AppTheme.warning,
-                subtitle: 'Perlu diverifikasi',
-              ),
-              const SizedBox(height: 12),
-              _AlertCard(
-                icon: Icons.warning_amber,
-                title: 'Stok Kritis',
-                value: '${data['alerts']['lowStockCount']}',
-                color: AppTheme.danger,
-                subtitle: 'Obat perlu restok',
-              ),
-              const SizedBox(height: 12),
-              _AlertCard(
-                icon: Icons.event_busy,
-                title: 'Hampir Expired',
-                value: '${data['alerts']['nearExpiryCount']}',
-                color: Colors.orange,
-                subtitle: 'Dalam 30 hari ke depan',
-              ),
-              const SizedBox(height: 24),
-
-              // Penjualan hari ini
+              // Penjualan hari ini (Modern Card)
               Container(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: AppTheme.primary,
-                  borderRadius: BorderRadius.circular(12),
+                  gradient: const LinearGradient(
+                    colors: [AppTheme.primary, AppTheme.primaryLight],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppTheme.primary.withOpacity(0.3),
+                      blurRadius: 15,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.payments, color: Colors.white, size: 32),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.payments_rounded, color: Colors.white, size: 32),
+                    ),
                     const SizedBox(width: 16),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'Pendapatan Hari Ini',
-                          style: TextStyle(
-                            color: Colors.white70,
-                            fontSize: 13,
-                          ),
+                          'Pendapatan Masuk',
+                          style: TextStyle(color: Colors.white70, fontSize: 13),
                         ),
                         Text(
                           currency.format(data['today']['revenue']),
                           style: const TextStyle(
                             color: Colors.white,
-                            fontSize: 22,
+                            fontSize: 24,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -186,6 +239,43 @@ class _ApotekerDashboard extends ConsumerWidget {
                   ],
                 ),
               ),
+              const SizedBox(height: 24),
+
+              const Text(
+                'Perhatian Utama',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Alert cards
+              _AlertCard(
+                icon: Icons.pending_actions_rounded,
+                title: 'Order Menunggu',
+                value: '${data['alerts']['pendingOrders']}',
+                color: AppTheme.warning,
+                subtitle: 'Perlu verifikasi Anda',
+              ),
+              const SizedBox(height: 16),
+              _AlertCard(
+                icon: Icons.warning_amber_rounded,
+                title: 'Stok Kritis',
+                value: '${data['alerts']['lowStockCount']}',
+                color: AppTheme.danger,
+                subtitle: 'Obat segera habis',
+              ),
+              const SizedBox(height: 16),
+              _AlertCard(
+                icon: Icons.event_busy_rounded,
+                title: 'Hampir Expired',
+                value: '${data['alerts']['nearExpiryCount']}',
+                color: Colors.orange,
+                subtitle: 'Dalam 30 hari ke depan',
+              ),
+              const SizedBox(height: 80), // padding untuk FAB
             ],
           ),
         );
@@ -211,13 +301,13 @@ class _OrdersTab extends ConsumerWidget {
         final orders = snapshot.data?.data as List? ?? [];
 
         if (orders.isEmpty) {
-          return const Center(
+          return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.shopping_bag_outlined, size: 64, color: Colors.grey),
-                SizedBox(height: 8),
-                Text('Tidak ada order'),
+                Icon(Icons.shopping_bag_outlined, size: 80, color: Colors.grey.shade300),
+                const SizedBox(height: 16),
+                Text('Belum ada pesanan masuk', style: TextStyle(color: Colors.grey.shade600)),
               ],
             ),
           );
@@ -228,7 +318,7 @@ class _OrdersTab extends ConsumerWidget {
             ref.invalidate(authProvider);
           },
           child: ListView.builder(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(20),
             itemCount: orders.length,
             itemBuilder: (context, index) {
               final order = orders[index];
@@ -267,7 +357,7 @@ class _StokTab extends ConsumerWidget {
         final drugs = snapshot.data?.data as List? ?? [];
 
         return ListView.builder(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(20),
           itemCount: drugs.length,
           itemBuilder: (context, index) {
             final drug = drugs[index];
@@ -277,33 +367,37 @@ class _StokTab extends ConsumerWidget {
             final isLow = totalStock <= (drug['minStock'] as int);
 
             return Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.all(12),
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(16),
                 border: Border.all(
                   color: isLow
                       ? AppTheme.danger.withOpacity(0.3)
-                      : Colors.grey.shade200,
+                      : Colors.grey.shade100,
                 ),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 8),
+                ],
               ),
               child: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: isLow
                           ? AppTheme.danger.withOpacity(0.1)
                           : AppTheme.primary.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(
                       Icons.medication,
                       color: isLow ? AppTheme.danger : AppTheme.primary,
+                      size: 28,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -312,9 +406,10 @@ class _StokTab extends ConsumerWidget {
                           drug['name'],
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
-                            fontSize: 14,
+                            fontSize: 16,
                           ),
                         ),
+                        const SizedBox(height: 4),
                         Text(
                           drug['category'],
                           style: const TextStyle(
@@ -333,14 +428,15 @@ class _StokTab extends ConsumerWidget {
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           color: isLow ? AppTheme.danger : AppTheme.success,
-                          fontSize: 16,
+                          fontSize: 18,
                         ),
                       ),
                       if (isLow)
                         const Text(
                           'Stok Kritis!',
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
                             color: AppTheme.danger,
                           ),
                         ),
@@ -356,7 +452,7 @@ class _StokTab extends ConsumerWidget {
   }
 }
 
-// Widget alert card
+// Widget alert card modern
 class _AlertCard extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -375,21 +471,28 @@ class _AlertCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: color.withOpacity(0.2)),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, color: color),
+            child: Icon(icon, color: color, size: 28),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -398,17 +501,18 @@ class _AlertCard extends StatelessWidget {
               children: [
                 Text(title,
                     style: const TextStyle(
-                        color: AppTheme.textSecondary, fontSize: 13)),
+                        color: AppTheme.textPrimary, fontWeight: FontWeight.bold, fontSize: 16)),
+                const SizedBox(height: 2),
                 Text(subtitle,
                     style: const TextStyle(
-                        color: AppTheme.textSecondary, fontSize: 11)),
+                        color: AppTheme.textSecondary, fontSize: 12)),
               ],
             ),
           ),
           Text(
             value,
             style: TextStyle(
-              fontSize: 28,
+              fontSize: 32,
               fontWeight: FontWeight.bold,
               color: color,
             ),
@@ -419,7 +523,7 @@ class _AlertCard extends StatelessWidget {
   }
 }
 
-// Widget order card
+// Widget order card modern
 class _OrderCard extends StatefulWidget {
   final Map<String, dynamic> order;
   final NumberFormat currency;
@@ -479,12 +583,18 @@ class _OrderCardState extends State<_OrderCard> {
     final items = widget.order['items'] as List? ?? [];
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: statusColor.withOpacity(0.3)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 8,
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -492,20 +602,38 @@ class _OrderCardState extends State<_OrderCard> {
           // Header order
           Row(
             children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.receipt_long, color: AppTheme.primary, size: 20),
+              ),
+              const SizedBox(width: 12),
               Expanded(
-                child: Text(
-                  widget.order['orderCode'],
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Kode Order',
+                      style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                    ),
+                    Text(
+                      widget.order['orderCode'],
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   color: statusColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(4),
+                  borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
                   currentStatus,
@@ -518,45 +646,77 @@ class _OrderCardState extends State<_OrderCard> {
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Divider(),
+          ),
 
           // Pasien
-          Text(
-            'Pasien: ${widget.order['patient']?['name'] ?? '-'}',
-            style: const TextStyle(
-              fontSize: 13,
-              color: AppTheme.textSecondary,
-            ),
+          Row(
+            children: [
+              const Icon(Icons.person_outline, size: 16, color: AppTheme.textSecondary),
+              const SizedBox(width: 8),
+              Text(
+                '${widget.order['patient']?['name'] ?? 'Pasien Umum'}',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
 
           // Items
-          ...items.take(2).map((item) => Text(
-                '• ${item['drug']['name']} x${item['quantity']}',
-                style: const TextStyle(fontSize: 13),
-              )),
-          if (items.length > 2)
-            Text(
-              '+ ${items.length - 2} item lainnya',
-              style: const TextStyle(
-                fontSize: 12,
-                color: AppTheme.textSecondary,
-              ),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(8),
             ),
-          const SizedBox(height: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ...items.take(2).map((item) => Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text(
+                    '• ${item['drug']['name']} x${item['quantity']}',
+                    style: TextStyle(fontSize: 13, color: Colors.grey.shade800),
+                  ),
+                )),
+                if (items.length > 2)
+                  Text(
+                    '+ ${items.length - 2} item lainnya',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.textSecondary,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
 
           // Total & tombol update
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                widget.currency.format(widget.order['totalAmount']),
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.primary,
-                  fontSize: 16,
-                ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Total Tagihan', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+                  Text(
+                    widget.currency.format(widget.order['totalAmount']),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.primary,
+                      fontSize: 18,
+                    ),
+                  ),
+                ],
               ),
-              const Spacer(),
               if (nextStatus.isNotEmpty)
                 ElevatedButton(
                   onPressed: () async {
@@ -565,8 +725,12 @@ class _OrderCardState extends State<_OrderCard> {
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: statusColor,
+                    foregroundColor: Colors.white,
                     padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
                   child: Text(
                     nextStatus == 'CONFIRMED'
@@ -574,7 +738,7 @@ class _OrderCardState extends State<_OrderCard> {
                         : nextStatus == 'PREPARING'
                             ? 'Siapkan'
                             : 'Tandai Siap',
-                    style: const TextStyle(fontSize: 12),
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                   ),
                 ),
             ],

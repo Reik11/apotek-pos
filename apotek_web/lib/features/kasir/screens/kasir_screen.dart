@@ -5,6 +5,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/main_layout.dart';
 import '../providers/kasir_provider.dart';
 import '../../../shared/models/drug_model.dart';
+import '../../../shared/widgets/drug_category_badge.dart';
 
 class KasirScreen extends ConsumerStatefulWidget {
   const KasirScreen({super.key});
@@ -458,7 +459,9 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
   }
 }
 
-// Widget kartu obat
+// ============================================================
+// Widget kartu obat — menggunakan DrugCategoryBadge
+// ============================================================
 class _DrugCard extends StatelessWidget {
   final DrugModel drug;
   final NumberFormat currency;
@@ -505,24 +508,11 @@ class _DrugCard extends StatelessWidget {
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
 
-            // Kategori
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: _getCategoryColor(drug.category).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(
-                drug.category,
-                style: TextStyle(
-                  fontSize: 10,
-                  color: _getCategoryColor(drug.category),
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
+            // ✅ Badge kategori — ganti Container lama dengan DrugCategoryBadge
+            DrugCategoryBadge(category: drug.category),
+
             const Spacer(),
 
             // Harga
@@ -548,22 +538,11 @@ class _DrugCard extends StatelessWidget {
       ),
     );
   }
-
-  Color _getCategoryColor(String category) {
-    switch (category) {
-      case 'KERAS':
-        return AppTheme.danger;
-      case 'BEBAS_TERBATAS':
-        return AppTheme.warning;
-      case 'NARKOTIKA':
-        return Colors.purple;
-      default:
-        return AppTheme.success;
-    }
-  }
 }
 
+// ============================================================
 // Widget item di keranjang
+// ============================================================
 class _CartItemWidget extends StatelessWidget {
   final CartItem item;
   final NumberFormat currency;
