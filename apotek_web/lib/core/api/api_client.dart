@@ -1,19 +1,29 @@
+import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class ApiClient {
-  static const String baseUrl = 'http://localhost:3000';
-  static final FlutterSecureStorage _storage = FlutterSecureStorage();
+  // Otomatis pilih URL berdasarkan platform
+  static String get baseUrl {
+    if (kIsWeb) {
+      // Flutter Web (Netlify) → pakai Render
+      return 'https://apotek-backend.onrender.com';
+    } else {
+      // Flutter Android (Emulator) → pakai Render juga
+      return 'https://apotek-backend.onrender.com';
+    }
+  }
+
+  static final FlutterSecureStorage _storage = const FlutterSecureStorage();
 
   static Dio createDio() {
     final dio = Dio(BaseOptions(
       baseUrl: baseUrl,
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 10),
+      connectTimeout: const Duration(seconds: 60),
+      receiveTimeout: const Duration(seconds: 60),
       headers: {'Content-Type': 'application/json'},
     ));
 
-    // Interceptor — otomatis tambah JWT token ke setiap request
     dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
@@ -24,7 +34,6 @@ class ApiClient {
           return handler.next(options);
         },
         onError: (error, handler) async {
-          // Kalau 401 Unauthorized, hapus token dan redirect ke login
           if (error.response?.statusCode == 401) {
             await _storage.delete(key: 'access_token');
           }
