@@ -11,10 +11,12 @@ export class TransactionsService {
     items: { drugId: string; quantity: number }[];
     paymentMethod: any;
     amountPaid: number;
+    discountType?: string;
+    discountValue?: number;
     notes?: string;
   }) {
     // Hitung total & validasi stok
-    let totalAmount = 0;
+    let subtotal = 0;
     const itemsWithBatch: {
         drugId: string;
         batchId: string;
@@ -39,17 +41,30 @@ export class TransactionsService {
         throw new BadRequestException(`Stok ${drug.name} tidak cukup`);
       }
 
-      const subtotal = drug.sellPrice * item.quantity;
-      totalAmount += subtotal;
+      const itemSubtotal = drug.sellPrice * item.quantity;
+      subtotal += itemSubtotal;
 
       itemsWithBatch.push({
         drugId: item.drugId,
         batchId: batch.id,
         quantity: item.quantity,
         sellPrice: drug.sellPrice,
-        subtotal,
+        subtotal: itemSubtotal,
       });
     }
+
+    // Hitung Diskon
+    const discountType = data.discountType || 'NOMINAL';
+    const discountValue = data.discountValue || 0;
+    let discountAmount = 0;
+
+    if (discountType === 'PERCENT') {
+      discountAmount = subtotal * (discountValue / 100);
+    } else {
+      discountAmount = discountValue;
+    }
+
+    const totalAmount = Math.max(0, subtotal - discountAmount);
 
     // Validasi uang bayar
     if (data.amountPaid < totalAmount) {
@@ -62,6 +77,10 @@ export class TransactionsService {
     const transaction = await this.prisma.transaction.create({
       data: {
         cashierId: data.cashierId,
+        subtotal,
+        discountType,
+        discountValue,
+        discountAmount,
         totalAmount,
         paymentMethod: data.paymentMethod,
         amountPaid: data.amountPaid,

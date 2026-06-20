@@ -21,6 +21,8 @@ class KasirState {
   final bool isProcessing;
   final String? error;
   final Map<String, dynamic>? lastTransaction;
+  final String discountType; // 'NOMINAL' atau 'PERCENT'
+  final double discountValue;
 
   KasirState({
     this.searchResults = const [],
@@ -29,10 +31,21 @@ class KasirState {
     this.isProcessing = false,
     this.error,
     this.lastTransaction,
+    this.discountType = 'NOMINAL',
+    this.discountValue = 0.0,
   });
 
-  double get totalAmount =>
-      cartItems.fold(0, (sum, item) => sum + item.subtotal);
+  double get subtotal =>
+      cartItems.fold(0.0, (sum, item) => sum + item.subtotal);
+
+  double get discountAmount => discountType == 'PERCENT'
+      ? subtotal * (discountValue / 100.0)
+      : discountValue;
+
+  double get totalAmount {
+    final finalAmount = subtotal - discountAmount;
+    return finalAmount < 0 ? 0.0 : finalAmount;
+  }
 
   KasirState copyWith({
     List<DrugModel>? searchResults,
@@ -41,6 +54,8 @@ class KasirState {
     bool? isProcessing,
     String? error,
     Map<String, dynamic>? lastTransaction,
+    String? discountType,
+    double? discountValue,
   }) {
     return KasirState(
       searchResults: searchResults ?? this.searchResults,
@@ -49,6 +64,8 @@ class KasirState {
       isProcessing: isProcessing ?? this.isProcessing,
       error: error,
       lastTransaction: lastTransaction ?? this.lastTransaction,
+      discountType: discountType ?? this.discountType,
+      discountValue: discountValue ?? this.discountValue,
     );
   }
 }
@@ -123,6 +140,16 @@ class KasirNotifier extends StateNotifier<KasirState> {
       cartItems: [],
       lastTransaction: null,
       searchResults: [],
+      discountType: 'NOMINAL',
+      discountValue: 0.0,
+    );
+  }
+
+  // Update diskon
+  void updateDiscount(String type, double value) {
+    state = state.copyWith(
+      discountType: type,
+      discountValue: value,
     );
   }
 
@@ -146,13 +173,13 @@ class KasirNotifier extends StateNotifier<KasirState> {
         'items': items,
         'paymentMethod': paymentMethod,
         'amountPaid': amountPaid,
+        'discountType': state.discountType,
+        'discountValue': state.discountValue,
       });
 
       state = state.copyWith(
         isProcessing: false,
         lastTransaction: response.data,
-        cartItems: [],
-        searchResults: [],
       );
       return true;
     } on DioException catch (e) {

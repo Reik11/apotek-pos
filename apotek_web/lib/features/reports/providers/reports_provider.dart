@@ -27,3 +27,23 @@ final expiryReportProvider = FutureProvider<Map<String, dynamic>>((ref) async {
 
 // Selected period provider
 final selectedPeriodProvider = StateProvider<String>((ref) => 'monthly');
+
+// Provider recall obat dari FDA
+final fdaRecallsProvider = FutureProvider<List<dynamic>>((ref) async {
+  final dio = ApiClient.createDio();
+  try {
+    final response = await dio.get('/external/fda/recalls');
+    return response.data as List? ?? [];
+  } catch (e) {
+    return [];
+  }
+});
+
+// Provider laporan keluhan dari pengguna (Admin)
+final adminReportsProvider =
+    FutureProvider.family<List<dynamic>, String>((ref, query) async {
+  final dio = ApiClient.createDio();
+  final response = await dio.get('/user-reports$query');
+  return response.data as List? ?? [];
+});
+

@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../features/auth/providers/auth_provider.dart';
 import 'profile_provider.dart';
+import '../pasien/screens/address_screen.dart';
+import '../pasien/screens/report_screen.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   final bool isFromBottomNav;
@@ -76,7 +78,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ),
               child: Column(
                 children: [
-                  // Avatar
+                  // Avatar DiceBear
                   Container(
                     width: 90,
                     height: 90,
@@ -85,13 +87,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       shape: BoxShape.circle,
                       border: Border.all(color: Colors.white, width: 3),
                     ),
-                    child: Center(
-                      child: Text(
-                        (user?.name ?? 'U').substring(0, 1).toUpperCase(),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 36,
-                          fontWeight: FontWeight.bold,
+                    child: ClipOval(
+                      child: Image.network(
+                        'https://api.dicebear.com/9.x/adventurer/png?seed=${Uri.encodeComponent(user?.name ?? 'User')}&backgroundColor=b6e3f4,c0aede,d1d4f9',
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Center(
+                          child: Text(
+                            (user?.name ?? 'U').substring(0, 1).toUpperCase(),
+                            style: const TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.bold),
+                          ),
                         ),
                       ),
                     ),
@@ -393,6 +397,72 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ),
 
                   const SizedBox(height: 16),
+
+                  // Section Alamat Pengiriman (Hanya Pasien)
+                  if (user?.role == 'PASIEN') ...[
+                    _SectionCard(
+                      title: 'Alamat Pengiriman',
+                      icon: Icons.location_on_outlined,
+                      child: Column(
+                        children: [
+                          const Text(
+                            'Kelola alamat pengiriman untuk pemesanan obat bebas Anda.',
+                            style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                          ),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (_) => const AddressScreen()),
+                                );
+                              },
+                              icon: const Icon(Icons.map_outlined, color: AppTheme.primary),
+                              label: const Text('Kelola Alamat', style: TextStyle(color: AppTheme.primary)),
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(color: AppTheme.primary),
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    _SectionCard(
+                      title: 'Laporan Pengaduan',
+                      icon: Icons.assignment_turned_in_outlined,
+                      child: Column(
+                        children: [
+                          const Text(
+                            'Kirimkan keluhan layanan, masalah pesanan, atau kualitas obat ke Admin.',
+                            style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                          ),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (_) => const ReportScreen()),
+                                );
+                              },
+                              icon: const Icon(Icons.message_outlined, color: AppTheme.primary),
+                              label: const Text('Kirim/Lihat Laporan', style: TextStyle(color: AppTheme.primary)),
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(color: AppTheme.primary),
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
 
                   // Section Info Akun
                   _SectionCard(

@@ -8,12 +8,14 @@ class InventoryState {
   final bool isLoading;
   final String? error;
   final String searchQuery;
+  final bool isSyncing;
 
   InventoryState({
     this.drugs = const [],
     this.isLoading = false,
     this.error,
     this.searchQuery = '',
+    this.isSyncing = false,
   });
 
   InventoryState copyWith({
@@ -21,12 +23,14 @@ class InventoryState {
     bool? isLoading,
     String? error,
     String? searchQuery,
+    bool? isSyncing,
   }) {
     return InventoryState(
       drugs: drugs ?? this.drugs,
       isLoading: isLoading ?? this.isLoading,
       error: error,
       searchQuery: searchQuery ?? this.searchQuery,
+      isSyncing: isSyncing ?? this.isSyncing,
     );
   }
 
@@ -107,7 +111,44 @@ class InventoryNotifier extends StateNotifier<InventoryState> {
       return null;
     }
   }
+
+  // Cek status sync dari backend
+  Future<void> checkSyncStatus() async {
+    try {
+      final response = await _dio.get('/external/sync/status');
+      state = state.copyWith(isSyncing: response.data['isSyncing'] as bool? ?? false);
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  // Picu sinkronisasi manual di background
+  Future<void> syncAllDrugs() async {
+    state = state.copyWith(isSyncing: true);
+    try {
+      await _dio.post('/external/sync/all');
+    } catch (e) {
+      state = state.copyWith(isSyncing: false);
+    }
+  }
+
+  // Hapus obat berdasarkan ID
+  Future<bool> deleteDrug(String drugId) async {
+    try {
+      await _dio.delete('/drugs/$drugId');
+      state = state.copyWith(
+        drugs: state.drugs.where((d) => d.id != drugId).toList(),
+      );
+      return true;
+    } on DioException catch (e) {
+      state = state.copyWith(
+        error: e.response?.data['message'] ?? 'Gagal menghapus obat',
+      );
+      return false;
+    }
+  }
 }
+
 
 final inventoryProvider =
     StateNotifierProvider<InventoryNotifier, InventoryState>((ref) {

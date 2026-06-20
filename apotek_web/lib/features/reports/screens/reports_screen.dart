@@ -14,6 +14,8 @@ class ReportsScreen extends ConsumerWidget {
     final selectedPeriod = ref.watch(selectedPeriodProvider);
     final salesAsync = ref.watch(salesReportProvider(selectedPeriod));
     final expiryAsync = ref.watch(expiryReportProvider);
+    final inventoryAsync = ref.watch(inventoryReportProvider);
+    final fdaRecallsAsync = ref.watch(fdaRecallsProvider);
     final currency =
         NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
 
@@ -161,6 +163,22 @@ class ReportsScreen extends ConsumerWidget {
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => const SizedBox(),
               data: (data) => _ExpiryReport(data: data),
+            ),
+            const SizedBox(height: 24),
+
+            // Laporan Inventaris (Persebaran Kategori)
+            inventoryAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => const SizedBox(),
+              data: (data) => _InventoryDistributionChart(data: data),
+            ),
+            const SizedBox(height: 24),
+
+            // Laporan Recall FDA (Keamanan Obat Global)
+            fdaRecallsAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => const SizedBox(),
+              data: (recalls) => _FdaRecallsWidget(recalls: recalls),
             ),
           ],
         ),
@@ -703,6 +721,316 @@ class _ExpiryBadge extends StatelessWidget {
               color: color,
               fontWeight: FontWeight.w600,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Widget Persebaran Kategori Obat (Pie Chart)
+class _InventoryDistributionChart extends StatelessWidget {
+  final Map<String, dynamic> data;
+
+  const _InventoryDistributionChart({required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    final drugs = List<Map<String, dynamic>>.from(data['drugs'] ?? []);
+    if (drugs.isEmpty) {
+      return Container(
+        height: 250,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Center(child: Text('Belum ada data inventaris')),
+      );
+    }
+
+    final categoryCounts = <String, int>{};
+    for (final d in drugs) {
+      final cat = d['category'] as String? ?? 'BEBAS';
+      categoryCounts[cat] = (categoryCounts[cat] ?? 0) + 1;
+    }
+
+    final colors = {
+      'BEBAS': Colors.green,
+      'BEBAS_TERBATAS': Colors.blue,
+      'KERAS': Colors.red,
+      'NARKOTIKA': Colors.purple,
+      'PSIKOTROPIKA': Colors.orange,
+    };
+
+    final total = categoryCounts.values.fold<int>(0, (sum, count) => sum + count);
+
+    final sections = categoryCounts.entries.map((e) {
+      final color = colors[e.key] ?? Colors.grey;
+      final value = e.value.toDouble();
+      final percent = total > 0 ? (value / total * 100) : 0.0;
+
+      return PieChartSectionData(
+        value: value,
+        title: '${percent.toStringAsFixed(1)}%',
+        color: color,
+        radius: 80,
+        titleStyle: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+        ),
+      );
+    }).toList();
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Persebaran Kategori Obat (Inventaris)',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                flex: 5,
+                child: SizedBox(
+                  height: 200,
+                  child: PieChart(
+                    PieChartData(
+                      sections: sections,
+                      sectionsSpace: 2,
+                      centerSpaceRadius: 0,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                flex: 5,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: categoryCounts.entries.map((e) {
+                    final color = colors[e.key] ?? Colors.grey;
+                    final displayKey = e.key.replaceAll('_', ' ');
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 12,
+                            height: 12,
+                            decoration: BoxDecoration(
+                              color: color,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              displayKey,
+                              style: const TextStyle(fontSize: 12),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          Text(
+                            '${e.value} obat',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Widget Feed Recall FDA (Keamanan Obat Global)
+class _FdaRecallsWidget extends StatelessWidget {
+  final List<dynamic> recalls;
+
+  const _FdaRecallsWidget({required this.recalls});
+
+  @override
+  Widget build(BuildContext context) {
+    if (recalls.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Center(
+          child: Column(
+            children: [
+              Icon(Icons.gpp_good, color: AppTheme.success, size: 48),
+              SizedBox(height: 12),
+              Text(
+                'Tidak ada laporan recall obat FDA terbaru',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              Text(
+                'Data dari openFDA API menunjukkan obat aman.',
+                style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: AppTheme.danger),
+              SizedBox(width: 8),
+              Text(
+                'Keamanan Obat Global & Recall (openFDA API)',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Informasi penarikan obat terbaru yang dirilis oleh FDA Amerika Serikat sebagai referensi keselamatan farmasi global.',
+            style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+          ),
+          const SizedBox(height: 16),
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: recalls.length,
+            separatorBuilder: (context, index) => const Divider(),
+            itemBuilder: (context, index) {
+              final recall = recalls[index];
+              final classification = recall['classification'] as String? ?? 'Class II';
+              final status = recall['status'] as String? ?? 'Ongoing';
+              final dateStr = recall['report_date'] as String? ?? '';
+              
+              Color classColor = Colors.orange;
+              if (classification.contains('Class I')) {
+                classColor = Colors.red;
+              } else if (classification.contains('Class III')) {
+                classColor = Colors.green;
+              }
+
+              String formattedDate = dateStr;
+              if (dateStr.length == 8) {
+                formattedDate = '${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}';
+              }
+
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: classColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: classColor.withOpacity(0.3)),
+                          ),
+                          child: Text(
+                            classification,
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: classColor,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            status,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blue,
+                            ),
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          formattedDate,
+                          style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      recall['product_description'] as String? ?? '',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: AppTheme.textPrimary,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Alasan Recall: ${recall['reason_for_recall'] as String? ?? ""}',
+                      style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              );
+            },
           ),
         ],
       ),

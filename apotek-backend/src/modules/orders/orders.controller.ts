@@ -17,7 +17,18 @@ export class OrdersController {
       patientId: req.user.id,
       items: body.items,
       notes: body.notes,
+      deliveryMethod: body.deliveryMethod,
+      addressId: body.addressId,
+      prescriptionId: body.prescriptionId,
+      shippingFee: body.shippingFee,
+      paymentMethod: body.paymentMethod,
     });
+  }
+
+  // Hitung biaya kirim
+  @Get('shipping-fee')
+  getShippingFee(@Query('city') city: string) {
+    return this.ordersService.getShippingFee(city);
   }
 
   // Admin/apoteker lihat semua order

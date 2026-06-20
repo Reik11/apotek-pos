@@ -35,6 +35,12 @@ export class ExternalController {
     return this.rxNormService.getGenericAlternatives(rxcui);
   }
 
+  // Info recall dari FDA
+  @Get('fda/recalls')
+  getFdaRecalls() {
+    return this.fdaService.getRecentRecalls();
+  }
+
   // Info label dari FDA
   @Get('fda/label')
   getFdaLabel(@Query('name') name: string) {

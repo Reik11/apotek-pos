@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ==================
@@ -17,12 +18,17 @@ model User {
   password     String
   role         Role     @default(KASIR)
   isActive     Boolean  @default(true)
+  phone        String?
+  avatarUrl    String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  transactions Transaction[]
-  orders       Order[]
-  ocrScans     OcrScan[]
+  transactions  Transaction[]
+  orders        Order[]
+  ocrScans      OcrScan[]
+  addresses     Address[]
+  prescriptions Prescription[]
+  reports       UserReport[]
 }
 
 enum Role {
@@ -51,6 +57,7 @@ model Drug {
   rxcui           String?
   bpomNumber      String?
   description     String?
+  imageUrl        String?
   rxnormName           String?
   rxnormIngredients    String?
   fdaIndications       String?
@@ -59,6 +66,7 @@ model Drug {
   fdaWarnings          String?
   fdaContraindications String?
   lastApiSync          DateTime?
+  requiresPrescription Boolean  @default(false)
   isActive        Boolean      @default(true)
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
@@ -122,6 +130,10 @@ model Transaction {
   id            String        @id @default(uuid())
   cashierId     String
   cashier       User          @relation(fields: [cashierId], references: [id])
+  subtotal      Float         @default(0)
+  discountType  String        @default("NOMINAL")
+  discountValue Float         @default(0)
+  discountAmount Float        @default(0)
   totalAmount   Float
   paymentMethod PaymentMethod @default(CASH)
   amountPaid    Float
@@ -164,18 +176,30 @@ model TransactionItem {
 // TABEL ORDER (PASIEN)
 // ==================
 model Order {
-  id          String      @id @default(uuid())
-  patientId   String
-  patient     User        @relation(fields: [patientId], references: [id])
-  totalAmount Float
-  status      OrderStatus @default(PENDING)
-  orderCode   String      @unique
-  paymentProof String?
-  notes       String?
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  id             String         @id @default(uuid())
+  patientId      String
+  patient        User           @relation(fields: [patientId], references: [id])
+  totalAmount    Float
+  shippingFee    Float          @default(0)
+  paymentMethod  String         @default("CASH")
+  status         OrderStatus    @default(PENDING)
+  orderCode      String         @unique
+  paymentProof   String?
+  notes          String?
+  deliveryMethod DeliveryMethod @default(PICKUP)
+  addressId      String?
+  address        Address?       @relation(fields: [addressId], references: [id])
+  prescriptionId String?
+  prescription   Prescription?  @relation(fields: [prescriptionId], references: [id])
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
   items OrderItem[]
+}
+
+enum DeliveryMethod {
+  PICKUP
+  DELIVERY
 }
 
 enum OrderStatus {
@@ -209,4 +233,84 @@ model OcrScan {
   rawText    String?
   parsedDrugs Json?
   createdAt  DateTime @default(now())
+}
+
+// ==================
+// TABEL ALAMAT
+// ==================
+model Address {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  label         String   @default("Rumah")
+  recipientName String
+  phone         String
+  street        String
+  city          String
+  province      String
+  postalCode    String
+  isDefault     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  orders Order[]
+}
+
+// ==================
+// TABEL RESEP DOKTER
+// ==================
+model Prescription {
+  id              String             @id @default(uuid())
+  patientId       String
+  patient         User               @relation(fields: [patientId], references: [id])
+  imageUrl        String
+  notes           String?
+  status          PrescriptionStatus @default(PENDING)
+  verifiedBy      String?
+  verifiedAt      DateTime?
+  prescribedDrugs Json?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  orders Order[]
+}
+
+enum PrescriptionStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+// ==================
+// TABEL LAPORAN PENGGUNA
+// ==================
+model UserReport {
+  id         String         @id @default(uuid())
+  userId     String
+  user       User           @relation(fields: [userId], references: [id])
+  title      String
+  category   ReportCategory @default(GENERAL)
+  message    String
+  status     ReportStatus   @default(OPEN)
+  adminReply String?
+  repliedBy  String?
+  repliedAt  DateTime?
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+}
+
+enum ReportCategory {
+  GENERAL
+  ORDER
+  DRUG_QUALITY
+  SERVICE
+  PAYMENT
+  OTHER
+}
+
+enum ReportStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
 }

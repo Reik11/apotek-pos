@@ -355,6 +355,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ),
             ),
           ],
+
+          const SizedBox(height: 16),
+
+          // Link ke Register
+          Center(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text('Belum punya akun? ', style: TextStyle(color: AppTheme.textSecondary, fontSize: 14)),
+                GestureDetector(
+                  onTap: () => context.go('/register'),
+                  child: const Text(
+                    'Daftar di sini',
+                    style: TextStyle(
+                      color: AppTheme.primary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

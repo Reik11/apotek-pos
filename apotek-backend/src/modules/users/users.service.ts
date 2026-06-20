@@ -1,6 +1,6 @@
 import {
   Injectable, NotFoundException,
-  UnauthorizedException, ConflictException,
+  UnauthorizedException, ConflictException, ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
@@ -48,4 +48,45 @@ export class UsersService {
 
     return { message: 'Password berhasil diubah' };
   }
-}
+
+  // LIST SEMUA PENGGUNA (Admin only)
+  async findAll() {
+    return this.prisma.user.findMany({
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        phone: true,
+        isActive: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  // TAMBAH PENGGUNA BARU (Admin only)
+  async create(data: {
+    name: string;
+    email: string;
+    password: string;
+    role: string;
+    phone?: string;
+  }) {
+    const existing = await this.prisma.user.findUnique({ where: { email: data.email } });
+    if (existing) throw new ConflictException('Email sudah digunakan');
+    const hashed = await bcrypt.hash(data.password, 10);
+    return this.prisma.user.create({
+      data: { ...data, password: hashed } as any,
+      select: { id: true, name: true, email: true, role: true, createdAt: true },
+    });
+  }
+
+  // HAPUS PENGGUNA (Admin only)
+  async remove(id: string, requesterId: string) {
+    if (id === requesterId) throw new ForbiddenException('Tidak bisa menghapus akun sendiri');
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) throw new NotFoundException('User tidak ditemukan');
+    return this.prisma.user.delete({ where: { id } });
+  }
+}

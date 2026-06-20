@@ -49,4 +49,17 @@ export class FdaService {
       }
     }
   }
+
+  // Ambil recall obat terbaru dari FDA
+  async getRecentRecalls() {
+    try {
+      const response = await axios.get(
+        'https://api.fda.gov/drug/enforcement.json?limit=5'
+      );
+      return response.data?.results || [];
+    } catch (error) {
+      this.logger.error('FDA recalls error:', error.message);
+      return [];
+    }
+  }
 }

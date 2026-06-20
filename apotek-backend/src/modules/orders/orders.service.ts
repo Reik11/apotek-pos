@@ -10,6 +10,11 @@ export class OrdersService {
     patientId: string;
     items: { drugId: string; quantity: number }[];
     notes?: string;
+    deliveryMethod?: 'PICKUP' | 'DELIVERY';
+    addressId?: string;
+    prescriptionId?: string;
+    shippingFee?: number;
+    paymentMethod?: string;
   }) {
     // Validasi stok & hitung total
     let totalAmount = 0;
@@ -19,6 +24,21 @@ export class OrdersService {
         price: number;
         subtotal: number;
     }[] = [];
+
+    // Validasi: delivery hanya untuk obat bebas
+    let hasRxDrug = false;
+    for (const item of data.items) {
+      const drug = await this.prisma.drug.findUnique({ where: { id: item.drugId }, select: { requiresPrescription: true, category: true } });
+      if (drug?.requiresPrescription) hasRxDrug = true;
+    }
+
+    if (data.deliveryMethod === 'DELIVERY' && hasRxDrug) {
+      throw new BadRequestException('Obat resep tidak dapat dikirim. Pasien harus mengambil langsung ke apotek.');
+    }
+
+    if (hasRxDrug && !data.prescriptionId) {
+      throw new BadRequestException('Pesanan yang mengandung obat resep memerlukan foto resep dokter yang valid.');
+    }
 
     for (const item of data.items) {
       const drug = await this.prisma.drug.findUnique({
@@ -49,6 +69,10 @@ export class OrdersService {
       });
     }
 
+    // Hitung shipping fee dan tambahkan ke totalAmount
+    const shippingFee = data.deliveryMethod === 'DELIVERY' ? (data.shippingFee || 0) : 0;
+    totalAmount += shippingFee;
+
     // Generate kode order unik
     const orderCode = `APT-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
@@ -57,15 +81,50 @@ export class OrdersService {
       data: {
         patientId: data.patientId,
         totalAmount,
+        shippingFee,
+        paymentMethod: data.paymentMethod || 'CASH',
         orderCode,
         notes: data.notes,
+        deliveryMethod: data.deliveryMethod || 'PICKUP',
+        addressId: data.addressId,
+        prescriptionId: data.prescriptionId,
         items: { create: itemsData },
       },
       include: {
         items: { include: { drug: true } },
         patient: { select: { id: true, name: true, email: true } },
+        address: true,
+        prescription: true,
       },
     });
+  }
+
+  // Hitung ongkir dinamis berdasarkan kota
+  getShippingFee(city: string) {
+    let fee = 15000;
+    if (!city) return { fee };
+    const c = city.toLowerCase();
+    if (
+      c.includes('jakarta') ||
+      c.includes('depok') ||
+      c.includes('tangerang') ||
+      c.includes('bekasi') ||
+      c.includes('bogor')
+    ) {
+      fee = 10000;
+    } else if (
+      c.includes('bandung') ||
+      c.includes('surabaya') ||
+      c.includes('semarang') ||
+      c.includes('yogyakarta') ||
+      c.includes('solo') ||
+      c.includes('malang')
+    ) {
+      fee = 20000;
+    } else {
+      fee = 35000;
+    }
+    return { fee };
   }
 
   // AMBIL SEMUA ORDER (ADMIN/APOTEKER)

@@ -60,7 +60,7 @@ class MainLayout extends ConsumerWidget {
           Expanded(
             child: SingleChildScrollView(
               child: Column(
-                children: _buildNavItems(context),
+                children: _buildNavItems(context, user),
               ),
             ),
           ),
@@ -123,7 +123,7 @@ class MainLayout extends ConsumerWidget {
     );
   }
 
-  List<Widget> _buildNavItems(BuildContext context) {
+  List<Widget> _buildNavItems(BuildContext context, dynamic user) {
     final navItems = [
       _NavItem(
           icon: Icons.dashboard_rounded,
@@ -138,13 +138,25 @@ class MainLayout extends ConsumerWidget {
       _NavItem(
           icon: Icons.bar_chart_rounded, label: 'Laporan', route: '/reports'),
       _NavItem(
+          icon: Icons.message_rounded,
+          label: 'Pengaduan',
+          route: '/admin-reports',
+          roles: ['SUPER_ADMIN', 'ADMIN', 'APOTEKER']),
+      _NavItem(
           icon: Icons.people_rounded,
           label: 'Pengguna',
           route: '/users',
           roles: ['SUPER_ADMIN', 'ADMIN']),
     ];
 
-    return navItems
+    final userRole = user?.role as String?;
+    final filteredItems = navItems.where((item) {
+      if (item.roles == null) return true;
+      if (userRole == null) return false;
+      return item.roles!.contains(userRole);
+    }).toList();
+
+    return filteredItems
         .map((item) => _NavItemWidget(
               item: item,
               isActive: currentRoute.startsWith(item.route),

@@ -28,6 +28,7 @@ class _ApotekerHomeScreenState extends ConsumerState<ApotekerHomeScreen> {
     final List<Widget> pages = [
       _ApotekerDashboard(currency: currency),
       _OrdersTab(currency: currency),
+      const _PrescriptionsTab(),
       _StokTab(currency: currency),
       const ProfileScreen(isFromBottomNav: true),
     ];
@@ -143,6 +144,10 @@ class _ApotekerHomeScreenState extends ConsumerState<ApotekerHomeScreen> {
             label: 'Orders',
           ),
           BottomNavigationBarItem(
+            icon: Icon(Icons.assignment_rounded),
+            label: 'Resep Masuk',
+          ),
+          BottomNavigationBarItem(
             icon: Icon(Icons.inventory_2_rounded),
             label: 'Stok Obat',
           ),
@@ -161,19 +166,131 @@ class _ApotekerDashboard extends ConsumerWidget {
   final NumberFormat currency;
   const _ApotekerDashboard({required this.currency});
 
+  Future<Map<String, dynamic>> _loadDashboardData() async {
+    final responses = await Future.wait([
+      ApiClient.createDio().get('/reports/dashboard'),
+      ApiClient.createDio().get('/drugs/alerts'),
+    ]);
+    return {
+      'dashboard': responses[0].data,
+      'alertsDetail': responses[1].data,
+    };
+  }
+
+  void _showLowStockSheet(BuildContext context, List<dynamic> lowStock) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, color: AppTheme.danger),
+                SizedBox(width: 8),
+                Text('Daftar Obat Stok Kritis', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            const Divider(height: 24),
+            if (lowStock.isEmpty)
+              const Center(child: Padding(padding: EdgeInsets.all(24), child: Text('Tidak ada obat dengan stok kritis')))
+            else
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: lowStock.length,
+                  separatorBuilder: (context, index) => const Divider(),
+                  itemBuilder: (context, index) {
+                    final item = lowStock[index];
+                    return ListTile(
+                      title: Text(item['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                      trailing: Text(
+                        'Stok: ${item['currentStock']} (Min: ${item['minStock']})',
+                        style: const TextStyle(color: AppTheme.danger, fontWeight: FontWeight.bold),
+                      ),
+                    );
+                  },
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showExpiringSheet(BuildContext context, List<dynamic> nearExpiry) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.event_busy_rounded, color: Colors.orange),
+                SizedBox(width: 8),
+                Text('Obat Hampir Kadaluarsa (<90 hari)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            const Divider(height: 24),
+            if (nearExpiry.isEmpty)
+              const Center(child: Padding(padding: EdgeInsets.all(24), child: Text('Tidak ada obat hampir kadaluarsa')))
+            else
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: nearExpiry.length,
+                  separatorBuilder: (context, index) => const Divider(),
+                  itemBuilder: (context, index) {
+                    final item = nearExpiry[index];
+                    final batches = item['batches'] as List? ?? [];
+                    final batchInfo = batches.map((b) {
+                      final date = DateTime.parse(b['expiredDate']);
+                      final formattedDate = DateFormat('dd MMM yyyy').format(date);
+                      return 'No: ${b['batchNumber']} (Stok: ${b['stock']}, Exp: $formattedDate)';
+                    }).join('\n');
+
+                    return ListTile(
+                      title: Text(item['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                      subtitle: Text(batchInfo, style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
+                    );
+                  },
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return FutureBuilder<dynamic>(
-      future: ApiClient.createDio().get('/reports/dashboard'),
+    return FutureBuilder<Map<String, dynamic>>(
+      future: _loadDashboardData(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
 
-        final data = snapshot.data?.data;
-        if (data == null) {
+        final responseData = snapshot.data;
+        if (responseData == null) {
           return const Center(child: Text('Gagal memuat data'));
         }
+
+        final data = responseData['dashboard'];
+        final alertsDetail = responseData['alertsDetail'];
+        final lowStockList = alertsDetail?['lowStock'] as List? ?? [];
+        final nearExpiryList = alertsDetail?['nearExpiry'] as List? ?? [];
 
         return SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -242,7 +359,7 @@ class _ApotekerDashboard extends ConsumerWidget {
               const SizedBox(height: 24),
 
               const Text(
-                'Perhatian Utama',
+                'Perhatian Utama (Ketuk untuk Detail)',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -266,6 +383,7 @@ class _ApotekerDashboard extends ConsumerWidget {
                 value: '${data['alerts']['lowStockCount']}',
                 color: AppTheme.danger,
                 subtitle: 'Obat segera habis',
+                onTap: () => _showLowStockSheet(context, lowStockList),
               ),
               const SizedBox(height: 16),
               _AlertCard(
@@ -273,7 +391,8 @@ class _ApotekerDashboard extends ConsumerWidget {
                 title: 'Hampir Expired',
                 value: '${data['alerts']['nearExpiryCount']}',
                 color: Colors.orange,
-                subtitle: 'Dalam 30 hari ke depan',
+                subtitle: 'Dalam 90 hari ke depan',
+                onTap: () => _showExpiringSheet(context, nearExpiryList),
               ),
               const SizedBox(height: 80), // padding untuk FAB
             ],
@@ -452,13 +571,487 @@ class _StokTab extends ConsumerWidget {
   }
 }
 
-// Widget alert card modern
+// Tab Resep Masuk (Apoteker Verifikasi)
+class _PrescriptionsTab extends StatefulWidget {
+  const _PrescriptionsTab();
+
+  @override
+  State<_PrescriptionsTab> createState() => _PrescriptionsTabState();
+}
+
+class _PrescriptionsTabState extends State<_PrescriptionsTab> {
+  List<dynamic> prescriptions = [];
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPrescriptions();
+  }
+
+  Future<void> _loadPrescriptions() async {
+    setState(() => isLoading = true);
+    try {
+      final response = await ApiClient.createDio().get('/prescriptions');
+      setState(() {
+        prescriptions = response.data as List? ?? [];
+        isLoading = false;
+      });
+    } catch (e) {
+      setState(() => isLoading = false);
+    }
+  }
+
+  Future<void> _verifyPrescription(String id, String status, {List<Map<String, dynamic>>? prescribedDrugs}) async {
+    try {
+      await ApiClient.createDio().patch(
+        '/prescriptions/$id/verify',
+        data: {
+          'status': status,
+          if (prescribedDrugs != null) 'prescribedDrugs': prescribedDrugs,
+        },
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Resep berhasil ${status == 'VERIFIED' ? 'disetujui' : 'ditolak'}'),
+            backgroundColor: status == 'VERIFIED' ? AppTheme.success : AppTheme.danger,
+          ),
+        );
+      }
+      _loadPrescriptions();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal verifikasi resep: $e'),
+            backgroundColor: AppTheme.danger,
+          ),
+        );
+      }
+    }
+  }
+
+  void _showPrescribeDialog(BuildContext context, String id) async {
+    List<dynamic> allDrugs = [];
+    List<dynamic> filteredDrugs = [];
+    List<Map<String, dynamic>> selectedDrugs = [];
+    bool isDialogLoading = true;
+
+    // Fetch drugs
+    try {
+      final res = await ApiClient.createDio().get('/drugs');
+      allDrugs = res.data as List? ?? [];
+      filteredDrugs = List.from(allDrugs);
+      isDialogLoading = false;
+    } catch (e) {
+      isDialogLoading = false;
+    }
+
+    if (!context.mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          if (isDialogLoading) {
+            return const AlertDialog(
+              content: SizedBox(
+                height: 100,
+                child: Center(child: CircularProgressIndicator()),
+              ),
+            );
+          }
+
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Row(
+              children: [
+                Icon(Icons.medical_services, color: AppTheme.primary),
+                SizedBox(width: 8),
+                Text('Pilih Obat untuk Resep'),
+              ],
+            ),
+            content: SizedBox(
+              width: 500,
+              height: 500,
+              child: Column(
+                children: [
+                  // Search
+                  TextField(
+                    decoration: const InputDecoration(
+                      hintText: 'Cari obat...',
+                      prefixIcon: Icon(Icons.search),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      border: OutlineInputBorder(),
+                    ),
+                    onChanged: (val) {
+                      setDialogState(() {
+                        if (val.isEmpty) {
+                          filteredDrugs = List.from(allDrugs);
+                        } else {
+                          filteredDrugs = allDrugs
+                              .where((d) =>
+                                  d['name']
+                                      .toString()
+                                      .toLowerCase()
+                                      .contains(val.toLowerCase()) ||
+                                  (d['genericName'] != null &&
+                                      d['genericName']
+                                          .toString()
+                                          .toLowerCase()
+                                          .contains(val.toLowerCase())))
+                              .toList();
+                        }
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  
+                  // Split view
+                  Expanded(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Left: Search results
+                        Expanded(
+                          flex: 5,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Hasil Cari', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                              const SizedBox(height: 4),
+                              Expanded(
+                                child: ListView.builder(
+                                  itemCount: filteredDrugs.length,
+                                  itemBuilder: (c, idx) {
+                                    final drug = filteredDrugs[idx];
+                                    final exists = selectedDrugs.any((sd) => sd['drugId'] == drug['id']);
+                                    return ListTile(
+                                      title: Text(drug['name'], style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                      subtitle: Text('${drug['category']} - Rp ${drug['sellPrice']}', style: const TextStyle(fontSize: 10)),
+                                      trailing: exists
+                                          ? const Icon(Icons.check_circle, color: AppTheme.success, size: 18)
+                                          : const Icon(Icons.add_circle_outline, color: AppTheme.primary, size: 18),
+                                      dense: true,
+                                      contentPadding: EdgeInsets.zero,
+                                      onTap: () {
+                                        setDialogState(() {
+                                          if (!exists) {
+                                            selectedDrugs.add({
+                                              'drugId': drug['id'],
+                                              'name': drug['name'],
+                                              'sellPrice': drug['sellPrice'],
+                                              'quantity': 1,
+                                            });
+                                          }
+                                        });
+                                      },
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const VerticalDivider(),
+                        
+                        // Right: Selected Items
+                        Expanded(
+                          flex: 5,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Obat Terpilih', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppTheme.primary)),
+                              const SizedBox(height: 4),
+                              Expanded(
+                                child: selectedDrugs.isEmpty
+                                    ? const Center(child: Text('Belum ada obat terpilih', style: TextStyle(fontSize: 10, color: Colors.grey)))
+                                    : ListView.builder(
+                                        itemCount: selectedDrugs.length,
+                                        itemBuilder: (c, idx) {
+                                          final sd = selectedDrugs[idx];
+                                          return Container(
+                                            margin: const EdgeInsets.only(bottom: 6),
+                                            padding: const EdgeInsets.all(6),
+                                            decoration: BoxDecoration(
+                                              color: Colors.grey.shade50,
+                                              borderRadius: BorderRadius.circular(8),
+                                              border: Border.all(color: Colors.grey.shade200),
+                                            ),
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(sd['name'], style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                                                Row(
+                                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                  children: [
+                                                    Text('Qty: ${sd['quantity']}', style: const TextStyle(fontSize: 10)),
+                                                    Row(
+                                                      children: [
+                                                        IconButton(
+                                                          icon: const Icon(Icons.remove_circle_outline, size: 14, color: AppTheme.danger),
+                                                          padding: EdgeInsets.zero,
+                                                          constraints: const BoxConstraints(),
+                                                          onPressed: () {
+                                                            setDialogState(() {
+                                                              if (sd['quantity'] > 1) {
+                                                                sd['quantity']--;
+                                                              } else {
+                                                                selectedDrugs.removeAt(idx);
+                                                              }
+                                                            });
+                                                          },
+                                                        ),
+                                                        const SizedBox(width: 8),
+                                                        IconButton(
+                                                          icon: const Icon(Icons.add_circle_outline, size: 14, color: AppTheme.success),
+                                                          padding: EdgeInsets.zero,
+                                                          constraints: const BoxConstraints(),
+                                                          onPressed: () {
+                                                            setDialogState(() {
+                                                              sd['quantity']++;
+                                                            });
+                                                          },
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ],
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                        },
+                                      ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: AppTheme.success),
+                onPressed: selectedDrugs.isEmpty
+                    ? null
+                    : () {
+                        Navigator.pop(ctx);
+                        _verifyPrescription(id, 'VERIFIED', prescribedDrugs: selectedDrugs);
+                      },
+                child: const Text('Setujui & Resepkan'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (isLoading) return const Center(child: CircularProgressIndicator());
+    
+    if (prescriptions.isEmpty) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.description_outlined, size: 80, color: Colors.grey),
+            SizedBox(height: 16),
+            Text('Belum ada resep masuk', style: TextStyle(fontWeight: FontWeight.bold)),
+            Text('Resep yang diupload pasien akan muncul di sini', style: TextStyle(fontSize: 12, color: Colors.grey)),
+          ],
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadPrescriptions,
+      child: ListView.separated(
+        padding: const EdgeInsets.all(20),
+        itemCount: prescriptions.length,
+        separatorBuilder: (context, index) => const SizedBox(height: 12),
+        itemBuilder: (context, index) {
+          final item = prescriptions[index];
+          final patient = item['patient'] ?? {};
+          final notes = item['notes'] ?? '';
+          final status = item['status'] as String? ?? 'PENDING';
+          final date = DateTime.parse(item['createdAt']);
+          final formattedDate = DateFormat('dd MMM yyyy, HH:mm').format(date);
+
+          Color statusColor = AppTheme.warning;
+          String statusText = 'Pending';
+          if (status == 'VERIFIED') {
+            statusColor = AppTheme.success;
+            statusText = 'Disetujui';
+          } else if (status == 'REJECTED') {
+            statusColor = AppTheme.danger;
+            statusText = 'Ditolak';
+          }
+
+          return Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: statusColor.withOpacity(0.3)),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 8),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      patient['name'] ?? 'Pasien Umum',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: statusColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        statusText,
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: statusColor),
+                      ),
+                    ),
+                  ],
+                ),
+                Text(
+                  patient['email'] ?? '',
+                  style: const TextStyle(fontSize: 11, color: Colors.grey),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Tanggal: $formattedDate',
+                  style: const TextStyle(fontSize: 11, color: Colors.grey),
+                ),
+                const Divider(height: 24),
+                
+                // Prescription image thumbnail & notes
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // View Image button
+                    GestureDetector(
+                      onTap: () {
+                        // Open full screen image dialog
+                        showDialog(
+                          context: context,
+                          builder: (ctx) => Dialog(
+                            backgroundColor: Colors.transparent,
+                            child: Stack(
+                              alignment: Alignment.topRight,
+                              children: [
+                                InteractiveViewer(
+                                  child: Image.network(item['imageUrl']),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                                  onPressed: () => Navigator.pop(ctx),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                      child: Container(
+                        width: 80,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.grey.shade200),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.network(
+                            item['imageUrl'],
+                            fit: BoxFit.cover,
+                            errorBuilder: (c, e, s) => const Icon(Icons.broken_image, color: Colors.grey),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Catatan Pasien:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textSecondary)),
+                          const SizedBox(height: 4),
+                          Text(
+                            notes.isNotEmpty ? notes : 'Tidak ada catatan.',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: notes.isNotEmpty ? AppTheme.textPrimary : Colors.grey,
+                              fontStyle: notes.isNotEmpty ? FontStyle.normal : FontStyle.italic,
+                            ),
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                
+                if (status == 'PENDING') ...[
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: AppTheme.danger),
+                          foregroundColor: AppTheme.danger,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        onPressed: () => _verifyPrescription(item['id'], 'REJECTED'),
+                        icon: const Icon(Icons.close, size: 16),
+                        label: const Text('Tolak', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      ),
+                      const SizedBox(width: 12),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.success,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        onPressed: () => _showPrescribeDialog(context, item['id']),
+                        icon: const Icon(Icons.check, size: 16),
+                        label: const Text('Setujui', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
 class _AlertCard extends StatelessWidget {
   final IconData icon;
   final String title;
   final String value;
   final Color color;
   final String subtitle;
+  final VoidCallback? onTap;
 
   const _AlertCard({
     required this.icon,
@@ -466,58 +1059,63 @@ class _AlertCard extends StatelessWidget {
     required this.value,
     required this.color,
     required this.subtitle,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withOpacity(0.2)),
-        boxShadow: [
-          BoxShadow(
-            color: color.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: color.withOpacity(0.2)),
+          boxShadow: [
+            BoxShadow(
+              color: color.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
-            child: Icon(icon, color: color, size: 28),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title,
-                    style: const TextStyle(
-                        color: AppTheme.textPrimary, fontWeight: FontWeight.bold, fontSize: 16)),
-                const SizedBox(height: 2),
-                Text(subtitle,
-                    style: const TextStyle(
-                        color: AppTheme.textSecondary, fontSize: 12)),
-              ],
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: color, size: 28),
             ),
-          ),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 32,
-              fontWeight: FontWeight.bold,
-              color: color,
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      style: const TextStyle(
+                          color: AppTheme.textPrimary, fontWeight: FontWeight.bold, fontSize: 16)),
+                  const SizedBox(height: 2),
+                  Text(subtitle,
+                      style: const TextStyle(
+                          color: AppTheme.textSecondary, fontSize: 12)),
+                ],
+              ),
             ),
-          ),
-        ],
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 32,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

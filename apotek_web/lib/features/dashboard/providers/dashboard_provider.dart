@@ -8,6 +8,8 @@ class DashboardSummary {
   final int pendingOrders;
   final int lowStockCount;
   final int nearExpiryCount;
+  final List<Map<String, dynamic>> salesChart;
+  final List<Map<String, dynamic>> recentTransactions;
 
   DashboardSummary({
     required this.todayRevenue,
@@ -15,6 +17,8 @@ class DashboardSummary {
     required this.pendingOrders,
     required this.lowStockCount,
     required this.nearExpiryCount,
+    required this.salesChart,
+    required this.recentTransactions,
   });
 
   factory DashboardSummary.fromJson(Map<String, dynamic> json) {
@@ -24,6 +28,9 @@ class DashboardSummary {
       pendingOrders: json['alerts']['pendingOrders'],
       lowStockCount: json['alerts']['lowStockCount'],
       nearExpiryCount: json['alerts']['nearExpiryCount'],
+      salesChart: List<Map<String, dynamic>>.from(json['salesChart'] ?? []),
+      recentTransactions:
+          List<Map<String, dynamic>>.from(json['recentTransactions'] ?? []),
     );
   }
 }
@@ -33,4 +40,10 @@ final dashboardProvider = FutureProvider<DashboardSummary>((ref) async {
   final dio = ApiClient.createDio();
   final response = await dio.get('/reports/dashboard');
   return DashboardSummary.fromJson(response.data);
+});
+
+final drugAlertsProvider = FutureProvider<Map<String, dynamic>>((ref) async {
+  final dio = ApiClient.createDio();
+  final response = await dio.get('/drugs/alerts');
+  return response.data as Map<String, dynamic>? ?? {};
 });

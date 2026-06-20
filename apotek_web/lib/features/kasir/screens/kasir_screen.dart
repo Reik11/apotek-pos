@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/main_layout.dart';
 import '../providers/kasir_provider.dart';
@@ -207,17 +210,106 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
                     ),
                   ),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Subtotal
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('Total',
+                          const Text('Subtotal', style: TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
+                          Text(currency.format(kasirState.subtotal), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+
+                      // Diskon Row
+                      Row(
+                        children: [
+                          const Text('Diskon', style: TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
+                          const SizedBox(width: 12),
+                          // Toggle Rp / %
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade100,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Row(
+                              children: [
+                                GestureDetector(
+                                  onTap: () {
+                                    ref.read(kasirProvider.notifier).updateDiscount('NOMINAL', 0.0);
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: kasirState.discountType == 'NOMINAL' ? AppTheme.primary : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text('Rp', style: TextStyle(fontSize: 10, color: kasirState.discountType == 'NOMINAL' ? Colors.white : AppTheme.textPrimary, fontWeight: FontWeight.bold)),
+                                  ),
+                                ),
+                                GestureDetector(
+                                  onTap: () {
+                                    ref.read(kasirProvider.notifier).updateDiscount('PERCENT', 0.0);
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: kasirState.discountType == 'PERCENT' ? AppTheme.primary : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text('%', style: TextStyle(fontSize: 10, color: kasirState.discountType == 'PERCENT' ? Colors.white : AppTheme.textPrimary, fontWeight: FontWeight.bold)),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          // Input Value
+                          Expanded(
+                            child: SizedBox(
+                              height: 32,
+                              child: TextField(
+                                keyboardType: TextInputType.number,
+                                style: const TextStyle(fontSize: 12),
+                                decoration: InputDecoration(
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  hintText: kasirState.discountType == 'PERCENT' ? 'Ex: 10' : 'Ex: 5000',
+                                  border: const OutlineInputBorder(),
+                                ),
+                                onChanged: (val) {
+                                  final doubleValue = double.tryParse(val) ?? 0.0;
+                                  ref.read(kasirProvider.notifier).updateDiscount(kasirState.discountType, doubleValue);
+                                },
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (kasirState.discountAmount > 0) ...[
+                        const SizedBox(height: 6),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Potongan', style: TextStyle(fontSize: 12, color: AppTheme.danger)),
+                            Text('- ${currency.format(kasirState.discountAmount)}', style: const TextStyle(fontSize: 12, color: AppTheme.danger, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+                      const Divider(),
+                      const SizedBox(height: 8),
+                      
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Grand Total',
                               style: TextStyle(
-                                  fontSize: 16, fontWeight: FontWeight.bold)),
+                                  fontSize: 15, fontWeight: FontWeight.bold)),
                           Text(
                             currency.format(kasirState.totalAmount),
                             style: const TextStyle(
-                              fontSize: 20,
+                              fontSize: 19,
                               fontWeight: FontWeight.bold,
                               color: AppTheme.primary,
                             ),
@@ -415,6 +507,118 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
     );
   }
 
+  Future<void> _printReceipt(Map<String, dynamic> tx) async {
+    final pdf = pw.Document();
+    final currency = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
+    final items = tx['items'] as List? ?? [];
+    final date = DateTime.parse(tx['createdAt']);
+    final formattedDate = DateFormat('dd-MM-yyyy HH:mm').format(date);
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: const PdfPageFormat(
+          58 * PdfPageFormat.mm,
+          double.infinity,
+          marginAll: 2 * PdfPageFormat.mm,
+        ),
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Center(
+                child: pw.Column(
+                  children: [
+                    pw.Text('APOTEK POS INDONESIA', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9)),
+                    pw.Text('Jl. Sehat Selalu No. 99, Depok', style: pw.TextStyle(fontSize: 6)),
+                    pw.Text('Telp: 021-98765432', style: pw.TextStyle(fontSize: 6)),
+                    pw.Text('-------------------------------------', style: pw.TextStyle(fontSize: 8)),
+                  ],
+                ),
+              ),
+              pw.Text('ID: ${tx['id'].toString().substring(0, 8)}', style: pw.TextStyle(fontSize: 6)),
+              pw.Text('Tgl: $formattedDate', style: pw.TextStyle(fontSize: 6)),
+              pw.Text('Apoteker: ${tx['cashier']?['name'] ?? 'Staff'}', style: pw.TextStyle(fontSize: 6)),
+              pw.Text('-------------------------------------', style: pw.TextStyle(fontSize: 8)),
+              
+              // Items list
+              ...items.map((item) {
+                final drug = item['drug'] ?? {};
+                return pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text('${drug['name']}', style: pw.TextStyle(fontSize: 6, fontWeight: pw.FontWeight.bold)),
+                    pw.Row(
+                      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                      children: [
+                        pw.Text('${item['quantity']} x ${currency.format(item['sellPrice'])}', style: pw.TextStyle(fontSize: 6)),
+                        pw.Text(currency.format(item['subtotal']), style: pw.TextStyle(fontSize: 6)),
+                      ],
+                    ),
+                  ],
+                );
+              }),
+              
+              pw.Text('-------------------------------------', style: pw.TextStyle(fontSize: 8)),
+              
+              // Calculations
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('Subtotal:', style: pw.TextStyle(fontSize: 6)),
+                  pw.Text(currency.format(tx['subtotal'] ?? tx['totalAmount']), style: pw.TextStyle(fontSize: 6)),
+                ],
+              ),
+              if (tx['discountAmount'] != null && (tx['discountAmount'] as num) > 0)
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text('Diskon:', style: pw.TextStyle(fontSize: 6)),
+                    pw.Text('- ${currency.format(tx['discountAmount'])}', style: pw.TextStyle(fontSize: 6)),
+                  ],
+                ),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('Total:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7)),
+                  pw.Text(currency.format(tx['totalAmount']), style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7)),
+                ],
+              ),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('Bayar:', style: pw.TextStyle(fontSize: 6)),
+                  pw.Text(currency.format(tx['amountPaid']), style: pw.TextStyle(fontSize: 6)),
+                ],
+              ),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('Kembali:', style: pw.TextStyle(fontSize: 6)),
+                  pw.Text(currency.format(tx['change']), style: pw.TextStyle(fontSize: 6)),
+                ],
+              ),
+              
+              pw.Text('-------------------------------------', style: pw.TextStyle(fontSize: 8)),
+              pw.Center(
+                child: pw.Column(
+                  children: [
+                    pw.Text('Terima Kasih', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7)),
+                    pw.Text('Semoga Lekas Sembuh', style: pw.TextStyle(fontSize: 6)),
+                  ],
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    await Printing.layoutPdf(
+      name: 'Struk_${tx['id'].toString().substring(0, 8)}',
+      onLayout: (PdfPageFormat format) async => pdf.save(),
+    );
+  }
+
   // Dialog sukses transaksi
   void _showSuccessDialog(BuildContext context, WidgetRef ref) {
     final kasirState = ref.read(kasirProvider);
@@ -443,15 +647,26 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
           ],
         ),
         actions: [
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                ref.read(kasirProvider.notifier).clearCart();
-              },
-              child: const Text('Transaksi Baru'),
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: tx == null ? null : () => _printReceipt(tx),
+                  icon: const Icon(Icons.print),
+                  label: const Text('Cetak Struk'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    ref.read(kasirProvider.notifier).clearCart();
+                  },
+                  child: const Text('Transaksi Baru'),
+                ),
+              ),
+            ],
           ),
         ],
       ),

@@ -246,6 +246,39 @@ export class ReportsService {
       (sum, t) => sum + t.totalAmount, 0
     );
 
+    // Grafik penjualan 7 hari terakhir
+    const salesChart: { date: string; revenue: number }[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const dayStart = new Date();
+      dayStart.setHours(0, 0, 0, 0);
+      dayStart.setDate(dayStart.getDate() - i);
+      const dayEnd = new Date(dayStart);
+      dayEnd.setDate(dayEnd.getDate() + 1);
+
+      const dayTxs = await this.prisma.transaction.findMany({
+        where: {
+          createdAt: { gte: dayStart, lt: dayEnd },
+          status: 'COMPLETED',
+        },
+        select: { totalAmount: true },
+      });
+      const revenue = dayTxs.reduce((s, t) => s + t.totalAmount, 0);
+      salesChart.push({
+        date: dayStart.toISOString().split('T')[0],
+        revenue,
+      });
+    }
+
+    // 5 transaksi terbaru
+    const recentTransactions = await this.prisma.transaction.findMany({
+      take: 5,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        cashier: { select: { name: true } },
+        items: { include: { drug: { select: { name: true } } } },
+      },
+    });
+
     return {
       today: {
         revenue: todayRevenue,
@@ -256,6 +289,15 @@ export class ReportsService {
         lowStockCount,
         nearExpiryCount,
       },
+      salesChart,
+      recentTransactions: recentTransactions.map((tx) => ({
+        id: tx.id,
+        cashierName: tx.cashier.name,
+        totalAmount: tx.totalAmount,
+        paymentMethod: tx.paymentMethod,
+        itemCount: tx.items.reduce((s, i) => s + i.quantity, 0),
+        createdAt: tx.createdAt,
+      })),
     };
   }
-}
+}

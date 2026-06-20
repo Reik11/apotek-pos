@@ -6,6 +6,8 @@ import '../../../../core/api/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../features/auth/providers/auth_provider.dart';
 import '../../profile/profile_screen.dart';
+import 'prescription_screen.dart';
+import 'address_screen.dart';
 
 class PasienHomeScreen extends ConsumerStatefulWidget {
   const PasienHomeScreen({super.key});
@@ -22,10 +24,19 @@ class _PasienHomeScreenState extends ConsumerState<PasienHomeScreen> {
   List<dynamic> allDrugs = [];
   List<dynamic> searchResults = [];
   List<dynamic> cartItems = [];
+  List<dynamic> savedAddresses = [];
+  String? _selectedAddressId;
+  
+  double shippingFee = 0;
+  String _paymentMethod = 'TRANSFER'; // 'CASH', 'TRANSFER', 'QRIS'
+  String? _selectedPrescriptionId;
+  List<dynamic> verifiedPrescriptions = [];
   
   bool isSearching = false;
   bool isLoadingHome = true;
   int _currentIndex = 0;
+  String _deliveryMethod = 'PICKUP'; // 'PICKUP' atau 'DELIVERY'
+  bool get _cartHasRxDrug => cartItems.any((item) => item['drug']['requiresPrescription'] == true);
 
   @override
   void initState() {
@@ -42,14 +53,67 @@ class _PasienHomeScreenState extends ConsumerState<PasienHomeScreen> {
   Future<void> _loadInitialData() async {
     try {
       final response = await ApiClient.createDio().get('/drugs');
+      final addrResponse = await ApiClient.createDio().get('/addresses/my');
+      final rxResponse = await ApiClient.createDio().get('/prescriptions/my');
       if (mounted) {
         setState(() {
-          allDrugs = response.data['data'] as List? ?? [];
+          allDrugs = response.data as List? ?? [];
+          savedAddresses = addrResponse.data as List? ?? [];
+          
+          final rxList = rxResponse.data as List? ?? [];
+          verifiedPrescriptions = rxList.where((rx) => rx['status'] == 'VERIFIED').toList();
+          
+          // Set default address
+          if (savedAddresses.isNotEmpty) {
+            final defaultAddr = savedAddresses.firstWhere(
+              (addr) => addr['isDefault'] == true,
+              orElse: () => savedAddresses.first,
+            );
+            _selectedAddressId = defaultAddr['id'];
+          } else {
+            _selectedAddressId = null;
+          }
           isLoadingHome = false;
         });
+        _updateShippingFee();
       }
     } catch (e) {
       if (mounted) setState(() => isLoadingHome = false);
+    }
+  }
+
+  Future<void> _updateShippingFee() async {
+    if (_deliveryMethod != 'DELIVERY') {
+      setState(() {
+        shippingFee = 0;
+      });
+      return;
+    }
+
+    if (_paymentMethod == 'CASH') {
+      setState(() {
+        _paymentMethod = 'TRANSFER';
+      });
+    }
+
+    if (_selectedAddressId == null) {
+      setState(() {
+        shippingFee = 0;
+      });
+      return;
+    }
+
+    final selectedAddr = savedAddresses.firstWhere((addr) => addr['id'] == _selectedAddressId, orElse: () => null);
+    if (selectedAddr == null) return;
+    try {
+      final res = await ApiClient.createDio().get('/orders/shipping-fee?city=${selectedAddr['city']}');
+      setState(() {
+        shippingFee = (res.data['fee'] as num).toDouble();
+      });
+    } catch (e) {
+      setState(() {
+        shippingFee = 15000; // fallback
+      });
     }
   }
 
@@ -74,8 +138,29 @@ class _PasienHomeScreenState extends ConsumerState<PasienHomeScreen> {
   }
 
   void _addToCart(Map<String, dynamic> drug) {
-    final existing =
-        cartItems.indexWhere((item) => item['drug']['id'] == drug['id']);
+    // Blokir obat resep dari ditambahkan ke keranjang langsung
+    if (drug['requiresPrescription'] == true) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Row(children: [
+            Icon(Icons.medical_services, color: AppTheme.warning),
+            SizedBox(width: 8),
+            Text('Obat Resep Dokter'),
+          ]),
+          content: const Text(
+            'Obat ini memerlukan resep dokter. Silakan datang langsung ke apotek dengan membawa resep Anda, atau upload resep terlebih dahulu melalui tab Resep.',
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Mengerti')),
+          ],
+        ),
+      );
+      return;
+    }
+
+    final existing = cartItems.indexWhere((item) => item['drug']['id'] == drug['id']);
     setState(() {
       if (existing >= 0) {
         cartItems[existing]['quantity']++;
@@ -100,9 +185,142 @@ class _PasienHomeScreenState extends ConsumerState<PasienHomeScreen> {
           (item['drug']['sellPrice'] as num).toDouble() *
               (item['quantity'] as int));
 
-  Future<void> _checkout() async {
+  void _checkout() {
     if (cartItems.isEmpty) return;
 
+    if (_paymentMethod == 'CASH') {
+      _processCheckout(null);
+      return;
+    }
+
+    // Tampilkan modal bayar
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        String? mockProofUrl;
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Text('Pembayaran (Simulasi Midtrans)'),
+            content: SizedBox(
+              width: 400,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Total Pembayaran:', style: TextStyle(color: AppTheme.textSecondary)),
+                  Text(
+                    currency.format(totalCart),
+                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  if (_paymentMethod == 'TRANSFER') ...[
+                    const Text('Silakan transfer ke rekening berikut:', style: TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: const Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Bank BCA: 1234567890', style: TextStyle(fontWeight: FontWeight.bold)),
+                          Text('a.n. Apotek POS Indonesia'),
+                          SizedBox(height: 4),
+                          Text('Bank Mandiri: 9876543210', style: TextStyle(fontWeight: FontWeight.bold)),
+                          Text('a.n. Apotek POS Indonesia'),
+                        ],
+                      ),
+                    ),
+                  ] else ...[
+                    const Text('Silakan scan QRIS berikut:', style: TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    Center(
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey.shade300),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Image.network(
+                          'https://api.dicebear.com/7.x/bottts/svg?seed=qris_mock',
+                          width: 120,
+                          height: 120,
+                        ),
+                      ),
+                    ),
+                  ],
+                  
+                  const SizedBox(height: 16),
+                  const Text('Bukti Pembayaran:', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  if (mockProofUrl == null)
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 45),
+                        side: const BorderSide(color: AppTheme.primary),
+                        foregroundColor: AppTheme.primary,
+                      ),
+                      onPressed: () {
+                        setDialogState(() {
+                          mockProofUrl = 'https://api.dicebear.com/7.x/bottts/svg?seed=proof_${DateTime.now().millisecondsSinceEpoch}';
+                        });
+                      },
+                      icon: const Icon(Icons.upload_file),
+                      label: const Text('Simulasikan Unggah Bukti Bayar'),
+                    )
+                  else
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppTheme.success.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppTheme.success.withOpacity(0.2)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.check_circle, color: AppTheme.success),
+                          const SizedBox(width: 8),
+                          const Expanded(
+                            child: Text('Bukti pembayaran diunggah', style: TextStyle(fontSize: 11, color: AppTheme.success)),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close, color: Colors.grey, size: 18),
+                            onPressed: () {
+                              setDialogState(() {
+                                mockProofUrl = null;
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+              ElevatedButton(
+                onPressed: mockProofUrl == null
+                    ? null
+                    : () {
+                        Navigator.pop(ctx);
+                        _processCheckout(mockProofUrl);
+                      },
+                child: const Text('Konfirmasi & Selesaikan'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _processCheckout(String? paymentProof) async {
     try {
       final items = cartItems
           .map((item) => {
@@ -113,53 +331,80 @@ class _PasienHomeScreenState extends ConsumerState<PasienHomeScreen> {
 
       final response = await ApiClient.createDio().post('/orders', data: {
         'items': items,
+        'deliveryMethod': _deliveryMethod,
+        'addressId': _deliveryMethod == 'DELIVERY' ? _selectedAddressId : null,
+        'prescriptionId': _selectedPrescriptionId,
+        'shippingFee': shippingFee,
+        'paymentMethod': _paymentMethod,
+        'paymentProof': paymentProof,
       });
 
       final order = response.data;
-      setState(() => cartItems = []);
+      setState(() {
+        cartItems = [];
+        _selectedPrescriptionId = null;
+      });
+      _loadInitialData();
 
       if (mounted) {
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: const Text('Order Berhasil!'),
+            title: const Text('Pesanan Berhasil! 🎉'),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.check_circle,
-                    color: AppTheme.success, size: 64),
+                const Icon(Icons.check_circle, color: AppTheme.success, size: 64),
                 const SizedBox(height: 16),
-                const Text(
-                  'Kode Order:',
-                  style: TextStyle(color: AppTheme.textSecondary),
-                ),
+                const Text('Kode Pesanan:', style: TextStyle(color: AppTheme.textSecondary)),
                 Text(
                   order['orderCode'],
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.primary,
-                  ),
+                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppTheme.primary),
                 ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Tunjukkan kode ini saat mengambil obat di apotek',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 13),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: _deliveryMethod == 'DELIVERY'
+                        ? AppTheme.primary.withOpacity(0.08)
+                        : AppTheme.success.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        _deliveryMethod == 'DELIVERY'
+                            ? Icons.local_shipping_outlined
+                            : Icons.store_outlined,
+                        color: _deliveryMethod == 'DELIVERY' ? AppTheme.primary : AppTheme.success,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _deliveryMethod == 'DELIVERY'
+                              ? 'Pesanan akan diantar ke alamat Anda'
+                              : 'Silakan ambil di apotek dengan menunjukkan kode ini',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: _deliveryMethod == 'DELIVERY' ? AppTheme.primary : AppTheme.success,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
             actions: [
               ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 45),
-                ),
+                style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 45)),
                 onPressed: () {
                   Navigator.pop(context);
-                  setState(() => _currentIndex = 2); // Ke tab riwayat
+                  setState(() => _currentIndex = 2);
                 },
-                child: const Text('Lihat Riwayat'),
+                child: const Text('Tutup'),
               ),
             ],
           ),
@@ -182,6 +427,7 @@ class _PasienHomeScreenState extends ConsumerState<PasienHomeScreen> {
     final List<Widget> pages = [
       _buildHomeTab(),
       _buildCartTab(),
+      const PrescriptionScreen(),
       _buildHistoryTab(),
       const ProfileScreen(isFromBottomNav: true),
     ];
@@ -311,6 +557,10 @@ class _PasienHomeScreenState extends ConsumerState<PasienHomeScreen> {
               ],
             ),
             label: 'Keranjang',
+          ),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.assignment_outlined),
+            label: 'Resep',
           ),
           const BottomNavigationBarItem(
             icon: Icon(Icons.receipt_long_rounded),
@@ -740,6 +990,75 @@ class _PasienHomeScreenState extends ConsumerState<PasienHomeScreen> {
             ),
           ),
         ),
+        if (verifiedPrescriptions.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(left: 20, right: 20, bottom: 12),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppTheme.primary.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppTheme.primary.withOpacity(0.2)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.assignment_turned_in, color: AppTheme.primary, size: 18),
+                      SizedBox(width: 8),
+                      Text(
+                        'Ada Resep Terverifikasi',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.primary),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    value: _selectedPrescriptionId,
+                    hint: const Text('Pilih resep untuk dimuat', style: TextStyle(fontSize: 12)),
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    ),
+                    items: verifiedPrescriptions.map((rx) {
+                      return DropdownMenuItem<String>(
+                        value: rx['id'],
+                        child: Text(
+                          'Resep #${rx['id'].toString().substring(0, 8)} (${DateFormat('dd MMM').format(DateTime.parse(rx['createdAt']))})',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (val) {
+                      if (val == null) return;
+                      final rx = verifiedPrescriptions.firstWhere((r) => r['id'] == val);
+                      final prescribed = rx['prescribedDrugs'] as List? ?? [];
+                      
+                      setState(() {
+                        _selectedPrescriptionId = val;
+                        cartItems = prescribed.map((item) {
+                          final localDrug = allDrugs.firstWhere((d) => d['id'] == item['drugId'], orElse: () => null);
+                          return {
+                            'drug': localDrug ?? {
+                              'id': item['drugId'],
+                              'name': item['name'],
+                              'sellPrice': item['sellPrice'],
+                              'requiresPrescription': true,
+                              'category': 'KERAS',
+                            },
+                            'quantity': item['quantity'] as int,
+                          };
+                        }).toList();
+                        _deliveryMethod = 'PICKUP';
+                      });
+                      _updateShippingFee();
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
         Expanded(
           child: cartItems.isEmpty
               ? Center(
@@ -811,6 +1130,9 @@ class _PasienHomeScreenState extends ConsumerState<PasienHomeScreen> {
                                       item['quantity']--;
                                     } else {
                                       cartItems.removeAt(index);
+                                      if (cartItems.isEmpty) {
+                                        _selectedPrescriptionId = null;
+                                      }
                                     }
                                   }),
                                 ),
@@ -835,7 +1157,7 @@ class _PasienHomeScreenState extends ConsumerState<PasienHomeScreen> {
         ),
         if (cartItems.isNotEmpty)
           Container(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
             decoration: BoxDecoration(
               color: Colors.white,
               boxShadow: [
@@ -847,36 +1169,333 @@ class _PasienHomeScreenState extends ConsumerState<PasienHomeScreen> {
               ],
             ),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // --- Metode Pengambilan ---
+                const Text('Metode Pengambilan',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                const SizedBox(height: 8),
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Total Pembayaran',
-                        style: TextStyle(
-                            fontSize: 14, color: AppTheme.textSecondary)),
-                    Text(
-                      currency.format(totalCart),
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.primary,
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () {
+                          setState(() => _deliveryMethod = 'PICKUP');
+                          _updateShippingFee();
+                        },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: _deliveryMethod == 'PICKUP'
+                                ? AppTheme.primary
+                                : Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: _deliveryMethod == 'PICKUP'
+                                  ? AppTheme.primary
+                                  : Colors.grey.shade300,
+                            ),
+                          ),
+                          child: Column(
+                            children: [
+                              Icon(Icons.store_outlined,
+                                  color: _deliveryMethod == 'PICKUP'
+                                      ? Colors.white
+                                      : AppTheme.textSecondary,
+                                  size: 20),
+                              const SizedBox(height: 4),
+                              Text('Ambil Sendiri',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: _deliveryMethod == 'PICKUP'
+                                        ? Colors.white
+                                        : AppTheme.textSecondary,
+                                  )),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: _cartHasRxDrug
+                            ? null
+                            : () {
+                                setState(() => _deliveryMethod = 'DELIVERY');
+                                _updateShippingFee();
+                              },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: _cartHasRxDrug
+                                ? Colors.grey.shade200
+                                : _deliveryMethod == 'DELIVERY'
+                                    ? AppTheme.primary
+                                    : Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: _cartHasRxDrug
+                                  ? Colors.grey.shade300
+                                  : _deliveryMethod == 'DELIVERY'
+                                      ? AppTheme.primary
+                                      : Colors.grey.shade300,
+                            ),
+                          ),
+                          child: Column(
+                            children: [
+                              Icon(Icons.local_shipping_outlined,
+                                  color: _cartHasRxDrug
+                                      ? Colors.grey.shade400
+                                      : _deliveryMethod == 'DELIVERY'
+                                          ? Colors.white
+                                          : AppTheme.textSecondary,
+                                  size: 20),
+                              const SizedBox(height: 4),
+                              Text('Antar ke Rumah',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: _cartHasRxDrug
+                                        ? Colors.grey.shade400
+                                        : _deliveryMethod == 'DELIVERY'
+                                            ? Colors.white
+                                            : AppTheme.textSecondary,
+                                  )),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
+                if (_cartHasRxDrug)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.info_outline, size: 13, color: AppTheme.warning),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            'Obat resep hanya bisa diambil langsung di apotek',
+                            style: TextStyle(fontSize: 11, color: Colors.orange.shade700),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                const SizedBox(height: 14),
+
+                // --- Pilihan Alamat Pengiriman ---
+                if (_deliveryMethod == 'DELIVERY') ...[
+                  const Text('Alamat Pengiriman',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  const SizedBox(height: 8),
+                  if (savedAddresses.isEmpty)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppTheme.danger.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppTheme.danger.withOpacity(0.2)),
+                      ),
+                      child: Column(
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(Icons.warning_amber_rounded, color: AppTheme.danger, size: 18),
+                              SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Anda belum memiliki alamat pengiriman.',
+                                  style: TextStyle(fontSize: 12, color: AppTheme.danger),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              minimumSize: const Size(double.infinity, 36),
+                              backgroundColor: AppTheme.primary,
+                            ),
+                            onPressed: () async {
+                              await Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => const AddressScreen()),
+                              );
+                              _loadInitialData(); // Reload addresses after return
+                            },
+                            icon: const Icon(Icons.add, size: 16),
+                            label: const Text('Tambah Alamat Baru', style: TextStyle(fontSize: 12)),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('Pilih Alamat:', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+                              TextButton(
+                                style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(50, 30)),
+                                onPressed: () async {
+                                  await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (_) => const AddressScreen()),
+                                  );
+                                  _loadInitialData(); // Reload addresses after return
+                                },
+                                child: const Text('Kelola Alamat', style: TextStyle(fontSize: 12)),
+                              ),
+                            ],
+                          ),
+                          DropdownButtonFormField<String>(
+                            value: _selectedAddressId,
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                              contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            ),
+                            items: savedAddresses.map((addr) {
+                              return DropdownMenuItem<String>(
+                                value: addr['id'],
+                                child: Text(
+                                  '[${addr['label']}] ${addr['street']}, ${addr['city']}',
+                                  style: const TextStyle(fontSize: 12),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (val) {
+                              setState(() {
+                                _selectedAddressId = val;
+                              });
+                              _updateShippingFee();
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  const SizedBox(height: 14),
+                ],
+
+                // --- Pilihan Metode Pembayaran ---
+                const Text('Metode Pembayaran',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    if (_deliveryMethod == 'PICKUP') ...[
+                      Expanded(
+                        child: ChoiceChip(
+                          label: const Center(child: Text('Bayar di Apotek', style: TextStyle(fontSize: 10))),
+                          selected: _paymentMethod == 'CASH',
+                          onSelected: (val) => setState(() => _paymentMethod = 'CASH'),
+                          selectedColor: AppTheme.primary,
+                          labelStyle: TextStyle(
+                            color: _paymentMethod == 'CASH' ? Colors.white : AppTheme.textPrimary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    Expanded(
+                      child: ChoiceChip(
+                        label: const Center(child: Text('Transfer Bank', style: TextStyle(fontSize: 10))),
+                        selected: _paymentMethod == 'TRANSFER',
+                        onSelected: (val) => setState(() => _paymentMethod = 'TRANSFER'),
+                        selectedColor: AppTheme.primary,
+                        labelStyle: TextStyle(
+                          color: _paymentMethod == 'TRANSFER' ? Colors.white : AppTheme.textPrimary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ChoiceChip(
+                        label: const Center(child: Text('QRIS', style: TextStyle(fontSize: 10))),
+                        selected: _paymentMethod == 'QRIS',
+                        onSelected: (val) => setState(() => _paymentMethod = 'QRIS'),
+                        selectedColor: AppTheme.primary,
+                        labelStyle: TextStyle(
+                          color: _paymentMethod == 'QRIS' ? Colors.white : AppTheme.textPrimary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+
+                // --- Total & Tombol Buat Pesanan ---
+                if (_deliveryMethod == 'DELIVERY') ...[
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Biaya Pengiriman',
+                          style: TextStyle(fontSize: 14, color: AppTheme.textSecondary)),
+                      Text(
+                        currency.format(shippingFee),
+                        style: const TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Total Pembayaran',
+                        style: TextStyle(fontSize: 14, color: AppTheme.textSecondary)),
+                    Text(
+                      currency.format(totalCart),
+                      style: const TextStyle(
+                          fontSize: 22, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
                   height: 50,
                   child: ElevatedButton(
-                    onPressed: _checkout,
+                    onPressed: (_deliveryMethod == 'DELIVERY' && _selectedAddressId == null) ? null : _checkout,
                     style: ElevatedButton.styleFrom(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    child: const Text('Buat Pesanan',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          _deliveryMethod == 'DELIVERY'
+                              ? Icons.local_shipping_outlined
+                              : Icons.store_outlined,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          _deliveryMethod == 'DELIVERY' ? 'Pesan & Antar' : 'Buat Pesanan',
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],

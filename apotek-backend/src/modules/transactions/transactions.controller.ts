@@ -17,6 +17,8 @@ export class TransactionsController {
       items: body.items,
       paymentMethod: body.paymentMethod,
       amountPaid: body.amountPaid,
+      discountType: body.discountType,
+      discountValue: body.discountValue,
       notes: body.notes,
     });
   }

@@ -6,11 +6,11 @@ class ApiClient {
   // Otomatis pilih URL berdasarkan platform
   static String get baseUrl {
     if (kIsWeb) {
-      // Flutter Web (Netlify) → pakai Render
-      return 'https://apotek-backend.onrender.com';
+      // Flutter Web mengakses localhost komputer
+      return 'http://localhost:3000';
     } else {
-      // Flutter Android (Emulator) → pakai Render juga
-      return 'https://apotek-backend.onrender.com';
+      // Flutter Android Emulator mengakses localhost komputer lewat IP khusus Android
+      return 'http://10.0.2.2:3000';
     }
   }
 

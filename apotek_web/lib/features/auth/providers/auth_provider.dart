@@ -69,8 +69,42 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = state.copyWith(isLoading: false, user: user, token: token);
       return true;
     } on DioException catch (e) {
-      final message = e.response?.data['message'] ?? 'Login gagal';
+      final message = e.response?.data['message'] ?? 'Koneksi ke server gagal atau salah password.';
       state = state.copyWith(isLoading: false, error: message);
+      return false;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: 'Terjadi kesalahan tidak terduga: $e');
+      return false;
+    }
+  }
+
+  // REGISTER (Pasien)
+  Future<bool> register({
+    required String name,
+    required String email,
+    required String password,
+  }) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final response = await _dio.post('/auth/register', data: {
+        'name': name,
+        'email': email,
+        'password': password,
+        'role': 'PASIEN',
+      });
+
+      final token = response.data['accessToken'];
+      final user = UserModel.fromJson(response.data['user']);
+
+      await _storage.write(key: 'access_token', value: token);
+      state = state.copyWith(isLoading: false, user: user, token: token);
+      return true;
+    } on DioException catch (e) {
+      final message = e.response?.data['message'] ?? 'Pendaftaran gagal. Email mungkin sudah terdaftar.';
+      state = state.copyWith(isLoading: false, error: message);
+      return false;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: 'Terjadi kesalahan: $e');
       return false;
     }
   }
@@ -80,7 +114,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
     await _storage.deleteAll();
     state = AuthState();
   }
+
+  // UPDATE user data di state (setelah edit profil)
+  void refreshUser(Map<String, dynamic> userData) {
+    final user = UserModel.fromJson(userData);
+    state = state.copyWith(user: user);
+  }
 }
+
 
 // Provider
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {

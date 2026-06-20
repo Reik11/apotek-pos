@@ -88,13 +88,12 @@ export class DrugsService {
     return this.prisma.drug.update({ where: { id }, data });
   }
 
-  // HAPUS OBAT (soft delete)
+  // HAPUS OBAT (hard delete)
   async remove(id: string) {
     await this.findOne(id);
-    return this.prisma.drug.update({
-      where: { id },
-      data: { isActive: false },
-    });
+    // Hapus batch terlebih dahulu
+    await this.prisma.drugBatch.deleteMany({ where: { drugId: id } });
+    return this.prisma.drug.delete({ where: { id } });
   }
 
   // TAMBAH STOK / BATCH BARU
@@ -147,5 +146,52 @@ export class DrugsService {
       const totalStock = drug.batches.reduce((sum, b) => sum + b.stock, 0);
       return totalStock <= drug.minStock;
     });
+  }
+
+  // Alert stok menipis & kadaluarsa
+  async getAlerts() {
+    const ninetyDaysFromNow = new Date();
+    ninetyDaysFromNow.setDate(ninetyDaysFromNow.getDate() + 90);
+
+    const drugs = await this.prisma.drug.findMany({
+      where: { isActive: true },
+      include: {
+        batches: {
+          where: { stock: { gt: 0 } },
+        },
+      },
+    });
+
+    const lowStock: any[] = [];
+    const nearExpiry: any[] = [];
+
+    for (const drug of drugs) {
+      const totalStock = drug.batches.reduce((sum, b) => sum + b.stock, 0);
+      if (totalStock <= drug.minStock) {
+        lowStock.push({
+          id: drug.id,
+          name: drug.name,
+          currentStock: totalStock,
+          minStock: drug.minStock,
+        });
+      }
+
+      const expiringBatches = drug.batches.filter(
+        (b) => new Date(b.expiredDate) <= ninetyDaysFromNow,
+      );
+      if (expiringBatches.length > 0) {
+        nearExpiry.push({
+          id: drug.id,
+          name: drug.name,
+          batches: expiringBatches.map((b) => ({
+            batchNumber: b.batchNumber,
+            stock: b.stock,
+            expiredDate: b.expiredDate,
+          })),
+        });
+      }
+    }
+
+    return { lowStock, nearExpiry };
   }
 }

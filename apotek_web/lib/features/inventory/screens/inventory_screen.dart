@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -20,17 +21,27 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
   final _searchController = TextEditingController();
   final currency =
       NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
+  Timer? _syncTimer;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(inventoryProvider.notifier).checkSyncStatus();
+      _syncTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+        if (mounted) {
+          ref.read(inventoryProvider.notifier).checkSyncStatus();
+        }
+      });
+    });
   }
 
   @override
   void dispose() {
     _tabController.dispose();
     _searchController.dispose();
+    _syncTimer?.cancel();
     super.dispose();
   }
 
@@ -71,6 +82,35 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
                         ],
                       ),
                     ),
+                    ElevatedButton.icon(
+                      onPressed: inventoryState.isSyncing
+                          ? null
+                          : () async {
+                              await ref.read(inventoryProvider.notifier).syncAllDrugs();
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Penyelarasan data FDA/RxNorm dimulai di background!'),
+                                    backgroundColor: AppTheme.success,
+                                  ),
+                                );
+                              }
+                            },
+                      icon: inventoryState.isSyncing
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.grey),
+                            )
+                          : const Icon(Icons.sync),
+                      label: Text(inventoryState.isSyncing ? 'Sedang Sinkronisasi...' : 'Sinkronisasi Medis'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: AppTheme.primary,
+                        side: const BorderSide(color: AppTheme.primary),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
                     ElevatedButton.icon(
                       onPressed: () => _showAddDrugDialog(context),
                       icon: const Icon(Icons.add),
@@ -308,9 +348,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
                               color: AppTheme.primary,
                             ),
                           ),
-                        ),
-
-                        // Aksi
+                        ),                         // Aksi
                         Padding(
                           padding: const EdgeInsets.all(8),
                           child: Row(
@@ -329,6 +367,12 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
                                 onPressed: () =>
                                     _showDrugInfoDialog(context, drug),
                               ),
+                              IconButton(
+                                icon: const Icon(Icons.delete_outline_rounded,
+                                    color: AppTheme.danger, size: 20),
+                                tooltip: 'Hapus Obat',
+                                onPressed: () => _confirmDeleteDrug(context, drug),
+                              ),
                             ],
                           ),
                         ),
@@ -344,6 +388,36 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
     );
   }
 
+  // Konfirmasi hapus obat
+  void _confirmDeleteDrug(BuildContext context, DrugModel drug) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Hapus Obat'),
+        content: Text(
+          'Hapus "${drug.name}" dari inventaris?\nSemua data batch/stok akan ikut terhapus.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Batal')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.danger),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Hapus'),
+          ),
+        ],
+      ),
+    );
+    if (confirm == true && mounted) {
+      final ok = await ref.read(inventoryProvider.notifier).deleteDrug(drug.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(ok ? '"${drug.name}" berhasil dihapus' : 'Gagal menghapus obat'),
+          backgroundColor: ok ? AppTheme.success : AppTheme.danger,
+        ));
+      }
+    }
+  }
+
   // Dialog tambah obat baru
   void _showAddDrugDialog(BuildContext context) {
     final nameController = TextEditingController();
@@ -355,6 +429,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
     String selectedCategory = 'BEBAS';
     String selectedType = 'GENERIK';
     bool isSearchingApi = false;
+    List<DrugModel> localSuggestions = [];
 
     showDialog(
       context: context,
@@ -380,6 +455,22 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
                           decoration: const InputDecoration(
                             hintText: 'Contoh: Amoxicillin 500mg',
                           ),
+                          onChanged: (val) {
+                            setDialogState(() {
+                              if (val.trim().isEmpty) {
+                                localSuggestions = [];
+                              } else {
+                                final lowerVal = val.toLowerCase();
+                                localSuggestions = ref
+                                    .read(inventoryProvider)
+                                    .drugs
+                                    .where((d) =>
+                                        d.name.toLowerCase().contains(lowerVal) ||
+                                        (d.genericName?.toLowerCase().contains(lowerVal) ?? false))
+                                    .toList();
+                              }
+                            });
+                          },
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -417,6 +508,83 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
                       ),
                     ],
                   ),
+
+                  // Suggestions list
+                  if (localSuggestions.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      constraints: const BoxConstraints(maxHeight: 200),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.grey.shade200),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.04),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: localSuggestions.length,
+                        separatorBuilder: (context, index) => const Divider(height: 1),
+                        itemBuilder: (context, index) {
+                          final drug = localSuggestions[index];
+                          return ListTile(
+                            dense: true,
+                            hoverColor: AppTheme.primary.withOpacity(0.05),
+                            title: Text(
+                              drug.name,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                              ),
+                            ),
+                            subtitle: Text(
+                              drug.genericName ?? drug.activeIngredient ?? '',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                            trailing: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppTheme.primary.withOpacity(0.08),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                drug.type,
+                                style: const TextStyle(
+                                  color: AppTheme.primary,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            onTap: () {
+                              setDialogState(() {
+                                nameController.text = drug.name;
+                                genericController.text = drug.genericName ?? '';
+                                ingredientController.text = drug.activeIngredient ?? '';
+                                if (['BEBAS', 'BEBAS_TERBATAS', 'KERAS', 'NARKOTIKA', 'PSIKOTROPIKA'].contains(drug.category)) {
+                                  selectedCategory = drug.category;
+                                }
+                                if (['GENERIK', 'PATEN', 'BPJS'].contains(drug.type)) {
+                                  selectedType = drug.type;
+                                }
+                                buyPriceController.text = drug.buyPrice.toInt().toString();
+                                sellPriceController.text = drug.sellPrice.toInt().toString();
+                                localSuggestions.clear();
+                              });
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 16),
 
                   // Nama generik
@@ -459,6 +627,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
                                 'BEBAS_TERBATAS',
                                 'KERAS',
                                 'NARKOTIKA',
+                                'PSIKOTROPIKA',
                               ]
                                   .map((c) => DropdownMenuItem(
                                       value: c, child: Text(c)))

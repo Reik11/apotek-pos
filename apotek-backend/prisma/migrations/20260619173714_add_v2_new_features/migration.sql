@@ -1,0 +1,12 @@
+-- AlterTable
+ALTER TABLE "Order" ADD COLUMN     "paymentMethod" TEXT NOT NULL DEFAULT 'CASH',
+ADD COLUMN     "shippingFee" DOUBLE PRECISION NOT NULL DEFAULT 0;
+
+-- AlterTable
+ALTER TABLE "Prescription" ADD COLUMN     "prescribedDrugs" JSONB;
+
+-- AlterTable
+ALTER TABLE "Transaction" ADD COLUMN     "discountAmount" DOUBLE PRECISION NOT NULL DEFAULT 0,
+ADD COLUMN     "discountType" TEXT NOT NULL DEFAULT 'NOMINAL',
+ADD COLUMN     "discountValue" DOUBLE PRECISION NOT NULL DEFAULT 0,
+ADD COLUMN     "subtotal" DOUBLE PRECISION NOT NULL DEFAULT 0;

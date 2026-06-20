@@ -25,6 +25,11 @@ export class DrugsController {
     return this.drugsService.getLowStockDrugs();
   }
 
+  @Get('alerts')
+  getAlerts() {
+    return this.drugsService.getAlerts();
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.drugsService.findOne(id);
