@@ -61,7 +61,11 @@ class _PasienHomeScreenState extends ConsumerState<PasienHomeScreen> {
           savedAddresses = addrResponse.data as List? ?? [];
           
           final rxList = rxResponse.data as List? ?? [];
-          verifiedPrescriptions = rxList.where((rx) => rx['status'] == 'VERIFIED').toList();
+          verifiedPrescriptions = rxList.where((rx) {
+            final isVerified = rx['status'] == 'VERIFIED';
+            final hasNoOrders = rx['orders'] == null || (rx['orders'] as List).isEmpty;
+            return isVerified && hasNoOrders;
+          }).toList();
           
           // Set default address
           if (savedAddresses.isNotEmpty) {
@@ -427,7 +431,37 @@ class _PasienHomeScreenState extends ConsumerState<PasienHomeScreen> {
     final List<Widget> pages = [
       _buildHomeTab(),
       _buildCartTab(),
-      const PrescriptionScreen(),
+      PrescriptionScreen(
+        onRedeemPrescription: (rx) {
+          final prescribed = rx['prescribedDrugs'] as List? ?? [];
+          setState(() {
+            _selectedPrescriptionId = rx['id'];
+            cartItems = prescribed.map((item) {
+              final localDrug = allDrugs.firstWhere((d) => d['id'] == item['drugId'], orElse: () => null);
+              return {
+                'drug': localDrug ?? {
+                  'id': item['drugId'],
+                  'name': item['name'],
+                  'sellPrice': item['sellPrice'],
+                  'requiresPrescription': true,
+                  'category': 'KERAS',
+                },
+                'quantity': item['quantity'] as int,
+              };
+            }).toList();
+            _deliveryMethod = 'PICKUP';
+            _currentIndex = 1; // Pindah ke tab keranjang
+          });
+          _updateShippingFee();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Resep berhasil dimuat ke keranjang!'),
+              backgroundColor: AppTheme.success,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        },
+      ),
       _buildHistoryTab(),
       const ProfileScreen(isFromBottomNav: true),
     ];

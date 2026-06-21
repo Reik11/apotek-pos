@@ -7,7 +7,12 @@ import '../../../../core/api/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
 
 class PrescriptionScreen extends ConsumerStatefulWidget {
-  const PrescriptionScreen({super.key});
+  final Function(Map<String, dynamic>)? onRedeemPrescription;
+
+  const PrescriptionScreen({
+    super.key,
+    this.onRedeemPrescription,
+  });
 
   @override
   ConsumerState<PrescriptionScreen> createState() => _PrescriptionScreenState();
@@ -458,6 +463,68 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
+                      if (status == 'VERIFIED' && item['prescribedDrugs'] != null) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.grey.shade100),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Rekomendasi Obat:',
+                                style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.textSecondary),
+                              ),
+                              const SizedBox(height: 4),
+                              ...(item['prescribedDrugs'] as List).map((drug) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 2),
+                                  child: Text(
+                                    '• ${drug['name']} (x${drug['quantity']})',
+                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
+                                  ),
+                                );
+                              }).toList(),
+                            ],
+                          ),
+                        ),
+                      ],
+                      if (status == 'VERIFIED') ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              (item['orders'] as List? ?? []).isNotEmpty ? 'Telah Ditebus' : 'Siap Ditebus',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: (item['orders'] as List? ?? []).isNotEmpty ? Colors.grey : AppTheme.success,
+                              ),
+                            ),
+                            if ((item['orders'] as List? ?? []).isEmpty)
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppTheme.primary,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  minimumSize: Size.zero,
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                ),
+                                onPressed: () {
+                                  widget.onRedeemPrescription?.call(item);
+                                },
+                                child: const Text('Beli Obat', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                              ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),

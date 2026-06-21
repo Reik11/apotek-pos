@@ -17,6 +17,7 @@ export class PrescriptionsService {
       where: status ? { status: status as any } : undefined,
       include: {
         patient: { select: { id: true, name: true, email: true } },
+        orders: { select: { id: true, orderCode: true, status: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -25,6 +26,9 @@ export class PrescriptionsService {
   async findByPatient(patientId: string) {
     return this.prisma.prescription.findMany({
       where: { patientId },
+      include: {
+        orders: { select: { id: true, orderCode: true, status: true } },
+      },
       orderBy: { createdAt: 'desc' },
     });
   }
