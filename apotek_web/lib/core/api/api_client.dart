@@ -6,7 +6,10 @@ class ApiClient {
   // Otomatis pilih URL berdasarkan platform
   static String get baseUrl {
     if (kIsWeb) {
-      // Flutter Web mengakses localhost komputer
+      // Di production (Netlify), gunakan URL Render backend. Di local, gunakan localhost.
+      if (kReleaseMode) {
+        return 'https://apotek-pos.onrender.com';
+      }
       return 'http://localhost:3000';
     } else {
       // Flutter Android Emulator mengakses localhost komputer lewat IP khusus Android

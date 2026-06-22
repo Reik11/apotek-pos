@@ -2,9 +2,11 @@
 
 set -e
 
-echo "=== Installing Flutter ==="
-git clone https://github.com/flutter/flutter.git flutter
+if [ ! -d "flutter" ]; then
+  git clone https://github.com/flutter/flutter.git flutter
+fi
 cd flutter
+git fetch
 git checkout 3.41.6
 cd ..
 export PATH="$PATH:`pwd`/flutter/bin"
