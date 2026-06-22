@@ -12,7 +12,11 @@ class ApiClient {
       }
       return 'http://localhost:3000';
     } else {
-      // Flutter Android Emulator mengakses localhost komputer lewat IP khusus Android
+      // Di HP Android fisik (Release Mode), gunakan URL Render backend.
+      // Di Emulator (Debug Mode), gunakan 10.0.2.2 untuk mengakses localhost.
+      if (kReleaseMode) {
+        return 'https://apotek-pos.onrender.com';
+      }
       return 'http://10.0.2.2:3000';
     }
   }
