@@ -15,6 +15,16 @@ export class TransactionsService {
     discountValue?: number;
     notes?: string;
   }) {
+    // 0. Cek shift aktif kasir
+    const activeShift = await this.prisma.cashShift.findFirst({
+      where: { cashierId: data.cashierId, status: 'OPEN' },
+    });
+    if (!activeShift) {
+      throw new BadRequestException(
+        'Laci kasir belum dibuka. Anda harus membuka shift kasir terlebih dahulu.',
+      );
+    }
+
     // Hitung total & validasi stok
     let subtotal = 0;
     const itemsWithBatch: {
@@ -77,6 +87,7 @@ export class TransactionsService {
     const transaction = await this.prisma.transaction.create({
       data: {
         cashierId: data.cashierId,
+        shiftId: activeShift.id,
         subtotal,
         discountType,
         discountValue,
@@ -157,5 +168,36 @@ export class TransactionsService {
       totalRevenue,
       averageTransaction: totalTransactions > 0 ? totalRevenue / totalTransactions : 0,
     };
+  }
+
+  // VOID TRANSAKSI (CANCEL & BALIKKAN STOK)
+  async voidTransaction(id: string) {
+    const tx = await this.findOne(id);
+    if (tx.status === 'CANCELLED') {
+      throw new BadRequestException('Transaksi sudah dibatalkan/void');
+    }
+    if (tx.status === 'REFUNDED') {
+      throw new BadRequestException('Transaksi sudah di-refund');
+    }
+
+    return this.prisma.$transaction(async (txPrisma) => {
+      // 1. Kembalikan stok untuk setiap item
+      for (const item of tx.items) {
+        await txPrisma.drugBatch.update({
+          where: { id: item.batchId },
+          data: { stock: { increment: item.quantity } },
+        });
+      }
+
+      // 2. Ubah status transaksi menjadi CANCELLED
+      return txPrisma.transaction.update({
+        where: { id },
+        data: { status: 'CANCELLED' },
+        include: {
+          cashier: { select: { id: true, name: true } },
+          items: { include: { drug: true } },
+        },
+      });
+    });
   }
 }

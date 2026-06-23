@@ -10,6 +10,8 @@ import '../../features/inventory/screens/inventory_screen.dart';
 import '../../features/reports/screens/reports_screen.dart';
 import '../../features/reports/screens/user_reports_screen.dart';
 import '../../features/users/screens/users_screen.dart';
+import '../../features/suppliers/screens/suppliers_screen.dart';
+import '../../features/purchase_orders/screens/purchase_orders_screen.dart';
 
 // Profile
 import '../../features/auth/screens/profile_screen.dart';
@@ -55,6 +57,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/users',
         builder: (context, state) => const UsersScreen(),
+      ),
+      GoRoute(
+        path: '/suppliers',
+        builder: (context, state) => const SuppliersScreen(),
+      ),
+      GoRoute(
+        path: '/purchase-orders',
+        builder: (context, state) => const PurchaseOrdersScreen(),
       ),
       GoRoute(
         path: '/profile',

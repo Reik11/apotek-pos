@@ -1,6 +1,6 @@
 import {
   Controller, Get, Post, Body,
-  Param, Query, UseGuards, Request,
+  Param, Query, UseGuards, Request, Patch,
 } from '@nestjs/common';
 import { TransactionsService } from './transactions.service';
 import { AuthGuard } from '@nestjs/passport';
@@ -39,5 +39,10 @@ export class TransactionsController {
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.transactionsService.findOne(id);
+  }
+
+  @Patch(':id/void')
+  voidTransaction(@Param('id') id: string) {
+    return this.transactionsService.voidTransaction(id);
   }
 }

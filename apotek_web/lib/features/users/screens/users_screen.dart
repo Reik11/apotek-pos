@@ -17,6 +17,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
   String _searchQuery = '';
 
   static const _roles = ['ADMIN', 'APOTEKER', 'KASIR', 'PASIEN'];
+  static const _shifts = ['PAGI', 'SIANG', 'MALAM', 'OFF'];
   static const _roleColors = {
     'SUPER_ADMIN': Color(0xFF7C3AED),
     'ADMIN': Color(0xFF2563EB),
@@ -125,17 +126,18 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                             borderRadius: BorderRadius.circular(12),
                             child: Table(
                               columnWidths: const {
-                                0: FlexColumnWidth(3),
-                                1: FlexColumnWidth(3),
-                                2: FlexColumnWidth(2),
-                                3: FlexColumnWidth(1.5),
-                                4: FlexColumnWidth(2),
-                                5: FlexColumnWidth(1.5),
+                                0: FlexColumnWidth(2.5),
+                                1: FlexColumnWidth(2.5),
+                                2: FlexColumnWidth(1.5),
+                                3: FlexColumnWidth(1.2),
+                                4: FlexColumnWidth(1.5),
+                                5: FlexColumnWidth(1.8),
+                                6: FlexColumnWidth(1.5),
                               },
                               children: [
                                 TableRow(
                                   decoration: const BoxDecoration(color: AppTheme.primary),
-                                  children: ['Nama', 'Email', 'Role', 'Status', 'Terdaftar', 'Aksi']
+                                  children: ['Nama', 'Email', 'Role', 'Shift', 'Status', 'Terdaftar', 'Aksi']
                                       .map((h) => Padding(
                                             padding: const EdgeInsets.all(12),
                                             child: Text(h,
@@ -203,6 +205,23 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                                           child: Text(
                                             role,
                                             style: TextStyle(color: roleColor, fontSize: 11, fontWeight: FontWeight.w600),
+                                            textAlign: TextAlign.center,
+                                          ),
+                                        ),
+                                      ),
+                                      // Shift
+                                      Padding(
+                                        padding: const EdgeInsets.all(12),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: Colors.purple.withValues(alpha: 0.08),
+                                            borderRadius: BorderRadius.circular(6),
+                                          ),
+                                          child: Text(
+                                            user['shift'] ?? 'OFF',
+                                            style: const TextStyle(color: Colors.purple, fontSize: 11, fontWeight: FontWeight.w600),
+                                            textAlign: TextAlign.center,
                                           ),
                                         ),
                                       ),
@@ -236,14 +255,25 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                                       ),
                                       // Aksi
                                       Padding(
-                                        padding: const EdgeInsets.all(8),
+                                        padding: const EdgeInsets.all(4),
                                         child: role == 'SUPER_ADMIN'
                                             ? const Icon(Icons.shield_rounded, color: Colors.grey, size: 18)
-                                            : IconButton(
-                                                icon: const Icon(Icons.delete_outline_rounded,
-                                                    color: AppTheme.danger, size: 20),
-                                                tooltip: 'Hapus Pengguna',
-                                                onPressed: () => _confirmDelete(context, user),
+                                            : Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  IconButton(
+                                                    icon: const Icon(Icons.edit_outlined,
+                                                        color: AppTheme.primary, size: 18),
+                                                    tooltip: 'Edit Pengguna',
+                                                    onPressed: () => _showEditUserDialog(context, user),
+                                                  ),
+                                                  IconButton(
+                                                    icon: const Icon(Icons.delete_outline_rounded,
+                                                        color: AppTheme.danger, size: 18),
+                                                    tooltip: 'Hapus Pengguna',
+                                                    onPressed: () => _confirmDelete(context, user),
+                                                  ),
+                                                ],
                                               ),
                                       ),
                                     ],
@@ -294,6 +324,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
     final phoneCtrl = TextEditingController();
     final passCtrl = TextEditingController();
     String selectedRole = 'KASIR';
+    String selectedShift = 'OFF';
     bool obscure = true;
 
     showDialog(
@@ -342,6 +373,15 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                     items: _roles.map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(),
                     onChanged: (v) => setS(() => selectedRole = v!),
                   ),
+                  const SizedBox(height: 12),
+                  const Text('Shift Kerja', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                  const SizedBox(height: 6),
+                  DropdownButtonFormField<String>(
+                    value: selectedShift,
+                    decoration: const InputDecoration(),
+                    items: _shifts.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+                    onChanged: (v) => setS(() => selectedShift = v!),
+                  ),
                 ],
               ),
             ),
@@ -356,12 +396,103 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                   'email': emailCtrl.text,
                   'password': passCtrl.text,
                   'role': selectedRole,
+                  'shift': selectedShift,
                   'phone': phoneCtrl.text.isEmpty ? null : phoneCtrl.text,
                 });
                 if (ok && ctx.mounted) {
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
                     content: Text('Pengguna berhasil ditambahkan!'),
+                    backgroundColor: AppTheme.success,
+                  ));
+                }
+              },
+              child: const Text('Simpan'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showEditUserDialog(BuildContext context, Map<String, dynamic> user) {
+    final nameCtrl = TextEditingController(text: user['name']);
+    final emailCtrl = TextEditingController(text: user['email']);
+    final phoneCtrl = TextEditingController(text: user['phone']);
+    String selectedRole = user['role'] ?? 'KASIR';
+    String selectedShift = user['shift'] ?? 'OFF';
+    bool isActive = user['isActive'] ?? true;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) => AlertDialog(
+          title: const Text('Edit Pengguna'),
+          content: SizedBox(
+            width: 420,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Nama Lengkap', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                  const SizedBox(height: 6),
+                  TextField(controller: nameCtrl, decoration: const InputDecoration(hintText: 'Nama Lengkap')),
+                  const SizedBox(height: 12),
+                  const Text('Email', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                  const SizedBox(height: 6),
+                  TextField(controller: emailCtrl, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(hintText: 'email@apotek.com')),
+                  const SizedBox(height: 12),
+                  const Text('No. Telepon (opsional)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                  const SizedBox(height: 6),
+                  TextField(controller: phoneCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(hintText: '08xx-xxxx-xxxx')),
+                  const SizedBox(height: 12),
+                  const Text('Role / Jabatan', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                  const SizedBox(height: 6),
+                  DropdownButtonFormField<String>(
+                    value: selectedRole,
+                    items: _roles.map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(),
+                    onChanged: (v) => setS(() => selectedRole = v!),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text('Shift Kerja', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                  const SizedBox(height: 6),
+                  DropdownButtonFormField<String>(
+                    value: selectedShift,
+                    items: _shifts.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+                    onChanged: (v) => setS(() => selectedShift = v!),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Checkbox(
+                        value: isActive,
+                        onChanged: (v) => setS(() => isActive = v!),
+                      ),
+                      const Text('Akun Aktif', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+            ElevatedButton(
+              onPressed: () async {
+                if (nameCtrl.text.isEmpty || emailCtrl.text.isEmpty) return;
+                final ok = await ref.read(usersProvider.notifier).updateUser(user['id'], {
+                  'name': nameCtrl.text,
+                  'email': emailCtrl.text,
+                  'role': selectedRole,
+                  'shift': selectedShift,
+                  'phone': phoneCtrl.text.isEmpty ? null : phoneCtrl.text,
+                  'isActive': isActive,
+                });
+                if (ok && ctx.mounted) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                    content: Text('Pengguna berhasil diperbarui!'),
                     backgroundColor: AppTheme.success,
                   ));
                 }

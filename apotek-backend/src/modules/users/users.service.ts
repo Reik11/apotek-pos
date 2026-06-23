@@ -59,6 +59,7 @@ export class UsersService {
         role: true,
         phone: true,
         isActive: true,
+        shift: true,
         createdAt: true,
       },
       orderBy: { createdAt: 'desc' },
@@ -72,13 +73,14 @@ export class UsersService {
     password: string;
     role: string;
     phone?: string;
+    shift?: string;
   }) {
     const existing = await this.prisma.user.findUnique({ where: { email: data.email } });
     if (existing) throw new ConflictException('Email sudah digunakan');
     const hashed = await bcrypt.hash(data.password, 10);
     return this.prisma.user.create({
       data: { ...data, password: hashed } as any,
-      select: { id: true, name: true, email: true, role: true, createdAt: true },
+      select: { id: true, name: true, email: true, role: true, shift: true, createdAt: true },
     });
   }
 
@@ -88,5 +90,40 @@ export class UsersService {
     const user = await this.prisma.user.findUnique({ where: { id } });
     if (!user) throw new NotFoundException('User tidak ditemukan');
     return this.prisma.user.delete({ where: { id } });
+  }
+
+  // UPDATE PENGGUNA (Admin only)
+  async update(id: string, data: {
+    name?: string;
+    email?: string;
+    role?: string;
+    phone?: string;
+    shift?: string;
+    isActive?: boolean;
+  }) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) throw new NotFoundException('User tidak ditemukan');
+
+    if (data.email && data.email !== user.email) {
+      const existing = await this.prisma.user.findFirst({
+        where: { email: data.email, NOT: { id } },
+      });
+      if (existing) throw new ConflictException('Email sudah digunakan');
+    }
+
+    return this.prisma.user.update({
+      where: { id },
+      data: data as any,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        phone: true,
+        isActive: true,
+        shift: true,
+        createdAt: true,
+      },
+    });
   }
 }

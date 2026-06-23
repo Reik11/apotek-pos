@@ -297,6 +297,7 @@ export class ReportsService {
         paymentMethod: tx.paymentMethod,
         itemCount: tx.items.reduce((s, i) => s + i.quantity, 0),
         createdAt: tx.createdAt,
+        status: tx.status,
       })),
     };
   }

@@ -143,6 +143,16 @@ class MainLayout extends ConsumerWidget {
           route: '/admin-reports',
           roles: ['SUPER_ADMIN', 'ADMIN', 'APOTEKER']),
       _NavItem(
+          icon: Icons.local_shipping_rounded,
+          label: 'Supplier',
+          route: '/suppliers',
+          roles: ['SUPER_ADMIN', 'ADMIN', 'APOTEKER']),
+      _NavItem(
+          icon: Icons.receipt_long_rounded,
+          label: 'Purchase Order',
+          route: '/purchase-orders',
+          roles: ['SUPER_ADMIN', 'ADMIN', 'APOTEKER']),
+      _NavItem(
           icon: Icons.people_rounded,
           label: 'Pengguna',
           route: '/users',

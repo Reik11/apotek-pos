@@ -5,6 +5,9 @@ import 'package:intl/intl.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/main_layout.dart';
 import '../providers/dashboard_provider.dart';
+import '../../../core/api/api_client.dart';
+import '../../auth/providers/auth_provider.dart';
+import '../../inventory/providers/inventory_provider.dart';
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
@@ -443,14 +446,73 @@ class _SalesChart extends StatelessWidget {
 }
 
 // ===== RECENT TRANSACTIONS =====
-class _RecentTransactions extends StatelessWidget {
+class _RecentTransactions extends ConsumerWidget {
   final List<Map<String, dynamic>> transactions;
   final NumberFormat currency;
 
   const _RecentTransactions({required this.transactions, required this.currency});
 
+  void _confirmVoid(BuildContext context, WidgetRef ref, String transactionId) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Konfirmasi Void', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: const Text(
+          'Apakah Anda yakin ingin membatalkan transaksi ini? '
+          'Tindakan ini akan mengembalikan stok obat ke batch semula dan mengubah status transaksi menjadi VOID.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Batal'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.danger,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () async {
+              Navigator.pop(context);
+              try {
+                final dio = ApiClient.createDio();
+                await dio.patch('/transactions/$transactionId/void');
+                
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Transaksi berhasil dibatalkan (void)'),
+                      backgroundColor: AppTheme.success,
+                    ),
+                  );
+                  // Refresh data
+                  ref.refresh(dashboardProvider);
+                  ref.refresh(drugAlertsProvider);
+                  ref.read(inventoryProvider.notifier).loadDrugs();
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Gagal membatalkan transaksi: $e'),
+                      backgroundColor: AppTheme.danger,
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('Ya, Void'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authProvider);
+    final userRole = authState.user?.role;
+    final isAdmin = userRole == 'ADMIN' || userRole == 'SUPER_ADMIN';
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -483,11 +545,13 @@ class _RecentTransactions extends StatelessWidget {
           else
             Table(
               columnWidths: const {
-                0: FlexColumnWidth(2),
-                1: FlexColumnWidth(2),
-                2: FlexColumnWidth(2),
-                3: FlexColumnWidth(1.5),
-                4: FlexColumnWidth(1.5),
+                0: FlexColumnWidth(1.2), // ID
+                1: FlexColumnWidth(2),   // Kasir
+                2: FlexColumnWidth(2),   // Total
+                3: FlexColumnWidth(1.2), // Metode
+                4: FlexColumnWidth(1.8), // Waktu
+                5: FlexColumnWidth(1.2), // Status
+                6: FlexColumnWidth(1.2), // Aksi
               },
               children: [
                 TableRow(
@@ -495,7 +559,7 @@ class _RecentTransactions extends StatelessWidget {
                     color: Colors.grey.shade50,
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  children: ['ID', 'Kasir', 'Total', 'Metode', 'Waktu']
+                  children: ['ID', 'Kasir', 'Total', 'Metode', 'Waktu', 'Status', 'Aksi']
                       .map((h) => Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
                             child: Text(h,
@@ -514,6 +578,20 @@ class _RecentTransactions extends StatelessWidget {
                   final createdAt = tx['createdAt'] != null
                       ? DateFormat('dd/MM HH:mm').format(DateTime.parse(tx['createdAt']).toLocal())
                       : '-';
+                  
+                  final status = tx['status'] as String? ?? 'COMPLETED';
+                  final Color statusColor;
+                  final String statusLabel;
+                  if (status == 'CANCELLED') {
+                    statusColor = AppTheme.danger;
+                    statusLabel = 'VOID';
+                  } else if (status == 'REFUNDED') {
+                    statusColor = AppTheme.warning;
+                    statusLabel = 'REFUND';
+                  } else {
+                    statusColor = AppTheme.success;
+                    statusLabel = 'SUKSES';
+                  }
 
                   return TableRow(
                     children: [
@@ -543,6 +621,39 @@ class _RecentTransactions extends StatelessWidget {
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
                         child: Text(createdAt, style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: statusColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            statusLabel,
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: statusColor,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        child: isAdmin && status == 'COMPLETED'
+                            ? TextButton.icon(
+                                onPressed: () => _confirmVoid(context, ref, tx['id']),
+                                icon: const Icon(Icons.cancel_outlined, size: 14, color: AppTheme.danger),
+                                label: const Text('Void', style: TextStyle(fontSize: 11, color: AppTheme.danger, fontWeight: FontWeight.bold)),
+                                style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  minimumSize: Size.zero,
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                ),
+                              )
+                            : const Text('-', style: TextStyle(fontSize: 12, color: Colors.grey)),
                       ),
                     ],
                   );

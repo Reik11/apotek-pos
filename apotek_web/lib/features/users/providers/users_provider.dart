@@ -67,6 +67,19 @@ class UsersNotifier extends StateNotifier<UsersState> {
       return false;
     }
   }
+
+  Future<bool> updateUser(String id, Map<String, dynamic> data) async {
+    try {
+      await _dio.put('/users/$id', data: data);
+      await loadUsers();
+      return true;
+    } on DioException catch (e) {
+      state = state.copyWith(
+        error: e.response?.data['message'] ?? 'Gagal memperbarui pengguna',
+      );
+      return false;
+    }
+  }
 }
 
 final usersProvider =

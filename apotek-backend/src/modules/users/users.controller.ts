@@ -26,12 +26,25 @@ export class UsersController {
       password: body.password,
       role: body.role,
       phone: body.phone,
+      shift: body.shift,
     });
   }
 
   @Delete(':id')
   remove(@Param('id') id: string, @Request() req: any) {
     return this.usersService.remove(id, req.user.id);
+  }
+
+  @Put(':id')
+  update(@Param('id') id: string, @Body() body: any) {
+    return this.usersService.update(id, {
+      name: body.name,
+      email: body.email,
+      role: body.role,
+      phone: body.phone,
+      shift: body.shift,
+      isActive: body.isActive,
+    });
   }
 
   // ==== USER SELF ENDPOINTS ====

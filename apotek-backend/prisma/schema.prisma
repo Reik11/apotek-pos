@@ -20,6 +20,7 @@ model User {
   isActive     Boolean  @default(true)
   phone        String?
   avatarUrl    String?
+  shift        StafShift @default(OFF)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -29,6 +30,7 @@ model User {
   addresses     Address[]
   prescriptions Prescription[]
   reports       UserReport[]
+  shifts        CashShift[]
 }
 
 enum Role {
@@ -113,14 +115,15 @@ model DrugBatch {
 // TABEL SUPPLIER
 // ==================
 model Supplier {
-  id        String      @id @default(uuid())
-  name      String
-  phone     String?
-  email     String?
-  address   String?
-  createdAt DateTime    @default(now())
+  id             String          @id @default(uuid())
+  name           String
+  phone          String?
+  email          String?
+  address        String?
+  createdAt      DateTime        @default(now())
 
-  batches   DrugBatch[]
+  batches        DrugBatch[]
+  purchaseOrders PurchaseOrder[]
 }
 
 // ==================
@@ -140,6 +143,8 @@ model Transaction {
   change        Float         @default(0)
   status        TxStatus      @default(COMPLETED)
   notes         String?
+  shiftId       String?
+  shift         CashShift?    @relation(fields: [shiftId], references: [id])
   createdAt     DateTime      @default(now())
 
   items TransactionItem[]
@@ -313,4 +318,72 @@ enum ReportStatus {
   IN_PROGRESS
   RESOLVED
   CLOSED
+}
+
+// ==================
+// TABEL PURCHASE ORDER
+// ==================
+model PurchaseOrder {
+  id          String        @id @default(uuid())
+  supplierId  String
+  supplier    Supplier      @relation(fields: [supplierId], references: [id])
+  orderDate   DateTime      @default(now())
+  status      POStatus      @default(PENDING)
+  totalAmount Float         @default(0)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  items       POItem[]
+}
+
+model POItem {
+  id              String        @id @default(uuid())
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+  drugId          String
+  drugName        String
+  quantity        Int
+  price           Float
+  subtotal        Float
+}
+
+enum POStatus {
+  PENDING
+  ORDERED
+  RECEIVED
+  CANCELLED
+}
+
+// ==================
+// SHIFT KASIR & STAF
+// ==================
+model CashShift {
+  id                String       @id @default(uuid())
+  cashierId         String
+  cashier           User         @relation(fields: [cashierId], references: [id])
+  startTime         DateTime     @default(now())
+  endTime           DateTime?
+  startBalance      Float
+  endBalance        Float?
+  expectedBalance   Float?
+  difference        Float?
+  totalSales        Float?
+  totalTransactions Int?
+  status            ShiftStatus  @default(OPEN)
+  notes             String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  transactions      Transaction[]
+}
+
+enum ShiftStatus {
+  OPEN
+  CLOSED
+}
+
+enum StafShift {
+  PAGI
+  SIANG
+  MALAM
+  OFF
 }

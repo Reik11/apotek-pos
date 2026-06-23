@@ -7,6 +7,7 @@ import 'package:printing/printing.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/main_layout.dart';
 import '../providers/kasir_provider.dart';
+import '../providers/shifts_provider.dart';
 import '../../../shared/models/drug_model.dart';
 import '../../../shared/widgets/drug_category_badge.dart';
 
@@ -31,6 +32,21 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
   @override
   Widget build(BuildContext context) {
     final kasirState = ref.watch(kasirProvider);
+    final shiftsState = ref.watch(shiftsProvider);
+
+    if (shiftsState.isLoading) {
+      return const MainLayout(
+        currentRoute: '/kasir',
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (shiftsState.activeShift == null) {
+      return MainLayout(
+        currentRoute: '/kasir',
+        child: _buildOpenShiftView(context, ref),
+      );
+    }
 
     return MainLayout(
       currentRoute: '/kasir',
@@ -48,13 +64,41 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Kasir',
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.textPrimary,
-                        ),
+                      Row(
+                        children: [
+                          const Text(
+                            'Kasir',
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppTheme.success.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.lock_open_rounded, size: 14, color: AppTheme.success),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Kasir Aktif: ${currency.format(shiftsState.activeShift?['startBalance'] ?? 0)}',
+                                  style: const TextStyle(fontSize: 12, color: AppTheme.success, fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Spacer(),
+                          TextButton.icon(
+                            onPressed: () => _showCloseShiftDialog(context, ref, shiftsState.activeShift!),
+                            icon: const Icon(Icons.lock_outline_rounded, color: AppTheme.danger, size: 18),
+                            label: const Text('Tutup Shift Kasir', style: TextStyle(color: AppTheme.danger, fontWeight: FontWeight.bold)),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 12),
                       TextField(
@@ -668,6 +712,300 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
               ),
             ],
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOpenShiftView(BuildContext context, WidgetRef ref) {
+    final startBalanceCtrl = TextEditingController(text: '50000');
+    final notesCtrl = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    return Center(
+      child: Container(
+        width: 420,
+        padding: const EdgeInsets.all(32),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.06),
+              blurRadius: 20,
+              offset: const Offset(0, 4),
+            ),
+          ],
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.point_of_sale_rounded, color: AppTheme.primary, size: 28),
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Center(
+                child: Text(
+                  'Buka Laci Kasir',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Center(
+                child: Text(
+                  'Untuk memulai transaksi, masukkan nominal saldo awal laci uang.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+                ),
+              ),
+              const SizedBox(height: 24),
+              const Text('Saldo Awal Uang Laci (Rp)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+              const SizedBox(height: 6),
+              TextFormField(
+                controller: startBalanceCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  hintText: 'Misal: 50000',
+                  prefixText: 'Rp ',
+                ),
+                validator: (val) {
+                  if (val == null || val.isEmpty) return 'Saldo awal wajib diisi';
+                  if (double.tryParse(val) == null) return 'Harus angka valid';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              const Text('Catatan (Opsional)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+              const SizedBox(height: 6),
+              TextField(
+                controller: notesCtrl,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  hintText: 'Misal: modal kembalian pecahan 5rb & 10rb',
+                ),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  onPressed: () async {
+                    if (formKey.currentState!.validate()) {
+                      final val = double.parse(startBalanceCtrl.text);
+                      final ok = await ref.read(shiftsProvider.notifier).openShift(val, notesCtrl.text.isEmpty ? null : notesCtrl.text);
+                      if (ok && context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                          content: Text('Shift kasir berhasil dibuka! Selamat bertugas.'),
+                          backgroundColor: AppTheme.success,
+                        ));
+                      }
+                    }
+                  },
+                  child: const Text('Buka Kasir & Mulai Kerja', style: TextStyle(fontSize: 14)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showCloseShiftDialog(BuildContext context, WidgetRef ref, Map<String, dynamic> activeShift) {
+    final endBalanceCtrl = TextEditingController();
+    final notesCtrl = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Tutup Shift Kasir'),
+          content: SizedBox(
+            width: 400,
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Anda akan menutup shift kasir saat ini. Silakan hitung uang tunai fisik yang ada di laci kasir dan masukkan nilainya.',
+                    style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  _buildInfoRow('Saldo Awal', currency.format(activeShift['startBalance'] ?? 0)),
+                  _buildInfoRow('Waktu Buka', DateFormat('dd/MM/yyyy HH:mm').format(DateTime.parse(activeShift['startTime']))),
+                  
+                  const SizedBox(height: 12),
+                  const Divider(),
+                  const SizedBox(height: 12),
+                  
+                  const Text('Total Uang Fisik Laci (Rp)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                  const SizedBox(height: 6),
+                  TextFormField(
+                    controller: endBalanceCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      hintText: 'Masukkan jumlah uang tunai fisik di laci',
+                      prefixText: 'Rp ',
+                    ),
+                    validator: (val) {
+                      if (val == null || val.isEmpty) return 'Uang fisik wajib diisi';
+                      if (double.tryParse(val) == null) return 'Harus angka valid';
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  const Text('Catatan Penutupan (Opsional)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: notesCtrl,
+                    maxLines: 2,
+                    decoration: const InputDecoration(
+                      hintText: 'Misal: aman, tidak ada selisih',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+            ElevatedButton(
+              onPressed: () async {
+                if (formKey.currentState!.validate()) {
+                  final val = double.parse(endBalanceCtrl.text);
+                  Navigator.pop(ctx); // close input dialog
+                  
+                  final result = await ref.read(shiftsProvider.notifier).closeShift(val, notesCtrl.text.isEmpty ? null : notesCtrl.text);
+                  if (result != null && context.mounted) {
+                    _showShiftSummaryDialog(context, result);
+                  }
+                }
+              },
+              child: const Text('Tutup Shift'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showShiftSummaryDialog(BuildContext context, Map<String, dynamic> shift) {
+    final startBal = shift['startBalance'] ?? 0;
+    final endBal = shift['endBalance'] ?? 0;
+    final expectedBal = shift['expectedBalance'] ?? 0;
+    final diff = shift['difference'] ?? 0;
+    final totalSales = shift['totalSales'] ?? 0;
+    final totalTx = shift['totalTransactions'] ?? 0;
+    
+    final diffColor = diff == 0
+        ? AppTheme.success
+        : diff < 0
+            ? AppTheme.danger
+            : Colors.amber.shade700;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.assignment_turned_in_rounded, color: AppTheme.primary),
+            SizedBox(width: 8),
+            Text('Rekapitulasi Shift Kasir'),
+          ],
+        ),
+        content: SizedBox(
+          width: 420,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Shift kasir Anda telah ditutup dengan sukses. Berikut ringkasan rekonsiliasi keuangan laci kasir:',
+                style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+              ),
+              const SizedBox(height: 16),
+              _buildInfoRow('Waktu Tutup', DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now())),
+              _buildInfoRow('Total Transaksi', '$totalTx kali'),
+              _buildInfoRow('Total Omzet Shift', currency.format(totalSales)),
+              const Divider(),
+              const SizedBox(height: 6),
+              _buildInfoRow('Saldo Awal Laci', currency.format(startBal)),
+              _buildInfoRow('Ekspektasi Laci', currency.format(expectedBal)),
+              _buildInfoRow('Uang Fisik Laci', currency.format(endBal)),
+              const Divider(),
+              const SizedBox(height: 6),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Selisih Keuangan:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  Text(
+                    currency.format(diff),
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: diffColor),
+                  ),
+                ],
+              ),
+              if (diff < 0) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppTheme.danger.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppTheme.danger.withValues(alpha: 0.3)),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.warning_amber_rounded, color: AppTheme.danger, size: 18),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Peringatan: Terdapat minus uang di laci. Harap laporkan ke admin/pemilik.',
+                          style: TextStyle(color: AppTheme.danger, fontSize: 11, fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Selesai'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+          Text(value, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
         ],
       ),
     );
