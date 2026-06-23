@@ -157,6 +157,7 @@ class KasirNotifier extends StateNotifier<KasirState> {
   Future<bool> processTransaction({
     required String paymentMethod,
     required double amountPaid,
+    String? notes,
   }) async {
     if (state.cartItems.isEmpty) return false;
 
@@ -175,6 +176,7 @@ class KasirNotifier extends StateNotifier<KasirState> {
         'amountPaid': amountPaid,
         'discountType': state.discountType,
         'discountValue': state.discountValue,
+        'notes': notes,
       });
 
       state = state.copyWith(

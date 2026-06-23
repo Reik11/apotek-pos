@@ -597,7 +597,21 @@ class _RecentTransactions extends ConsumerWidget {
                     children: [
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-                        child: Text('#$id', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.primary)),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('#$id', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.primary)),
+                            if (tx['notes'] != null && (tx['notes'] as String).trim().isNotEmpty) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                tx['notes'],
+                                style: const TextStyle(fontSize: 10, fontStyle: FontStyle.italic, color: Colors.grey),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),

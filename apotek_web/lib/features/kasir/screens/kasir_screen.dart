@@ -417,6 +417,7 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
     String selectedMethod = 'CASH';
     final amountController =
         TextEditingController(text: total.toInt().toString());
+    final notesController = TextEditingController();
 
     showDialog(
       context: context,
@@ -516,6 +517,19 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
                       ],
                     ),
                   ),
+                
+                const SizedBox(height: 12),
+                const Text('Catatan Transaksi (opsional)',
+                    style: TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: notesController,
+                  decoration: const InputDecoration(
+                    hintText: 'Tambahkan catatan jika diperlukan...',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 2,
+                ),
               ],
             ),
           ),
@@ -538,6 +552,7 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
                     await ref.read(kasirProvider.notifier).processTransaction(
                           paymentMethod: selectedMethod,
                           amountPaid: amountPaid,
+                          notes: notesController.text.trim().isEmpty ? null : notesController.text.trim(),
                         );
                 if (success && context.mounted) {
                   _showSuccessDialog(context, ref);
@@ -641,7 +656,10 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
                   pw.Text(currency.format(tx['change']), style: pw.TextStyle(fontSize: 6)),
                 ],
               ),
-              
+              if (tx['notes'] != null && (tx['notes'] as String).trim().isNotEmpty) ...[
+                pw.SizedBox(height: 4),
+                pw.Text('Catatan: ${tx['notes']}', style: pw.TextStyle(fontSize: 5, fontStyle: pw.FontStyle.italic)),
+              ],
               pw.Text('-------------------------------------', style: pw.TextStyle(fontSize: 8)),
               pw.Center(
                 child: pw.Column(
