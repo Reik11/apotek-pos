@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards, Request } from '@nestjs/common';
 import { ReportsService } from './reports.service';
 import { AuthGuard } from '@nestjs/passport';
 
@@ -8,22 +8,38 @@ export class ReportsController {
   constructor(private reportsService: ReportsService) {}
 
   @Get('dashboard')
-  getDashboard() {
-    return this.reportsService.getDashboardSummary();
+  getDashboard(@Request() req: any) {
+    let targetOutletId = undefined;
+    if (req.user.role !== 'SUPER_ADMIN') {
+      targetOutletId = req.user.outletId;
+    }
+    return this.reportsService.getDashboardSummary(targetOutletId);
   }
 
   @Get('sales')
-  getSales(@Query('period') period: any) {
-    return this.reportsService.getSalesReport(period || 'daily');
+  getSales(@Request() req: any, @Query('period') period: any) {
+    let targetOutletId = undefined;
+    if (req.user.role !== 'SUPER_ADMIN') {
+      targetOutletId = req.user.outletId;
+    }
+    return this.reportsService.getSalesReport(period || 'daily', targetOutletId);
   }
 
   @Get('inventory')
-  getInventory() {
-    return this.reportsService.getInventoryReport();
+  getInventory(@Request() req: any) {
+    let targetOutletId = undefined;
+    if (req.user.role !== 'SUPER_ADMIN') {
+      targetOutletId = req.user.outletId;
+    }
+    return this.reportsService.getInventoryReport(targetOutletId);
   }
 
   @Get('expiry')
-  getExpiry() {
-    return this.reportsService.getExpiryReport();
+  getExpiry(@Request() req: any) {
+    let targetOutletId = undefined;
+    if (req.user.role !== 'SUPER_ADMIN') {
+      targetOutletId = req.user.outletId;
+    }
+    return this.reportsService.getExpiryReport(targetOutletId);
   }
 }

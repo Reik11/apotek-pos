@@ -6,7 +6,7 @@ export class DrugsService {
   constructor(private prisma: PrismaService) {}
 
   // AMBIL SEMUA OBAT
-  async findAll(search?: string, category?: string) {
+  async findAll(search?: string, category?: string, outletId?: string) {
     return this.prisma.drug.findMany({
       where: {
         isActive: true,
@@ -23,7 +23,10 @@ export class DrugsService {
       },
       include: {
         batches: {
-          where: { stock: { gt: 0 } },
+          where: {
+            stock: { gt: 0 },
+            outletId: outletId || undefined,
+          },
           orderBy: { expiredDate: 'asc' },
         },
       },
@@ -104,6 +107,7 @@ export class DrugsService {
     buyPrice: number;
     expiredDate: string;
     supplierId?: string;
+    outletId?: string;
   }) {
   await this.findOne(data.drugId);
   return this.prisma.drugBatch.create({
@@ -114,12 +118,13 @@ export class DrugsService {
       buyPrice: data.buyPrice,
       expiredDate: new Date(data.expiredDate),
       supplierId: data.supplierId || null,
+      outletId: data.outletId || null,
     },
   });
 }
 
   // CEK OBAT HAMPIR EXPIRED
-  async getExpiringDrugs(days: number = 90) {
+  async getExpiringDrugs(days: number = 90, outletId?: string) {
     const futureDate = new Date();
     futureDate.setDate(futureDate.getDate() + days);
 
@@ -127,6 +132,7 @@ export class DrugsService {
       where: {
         expiredDate: { lte: futureDate },
         stock: { gt: 0 },
+        outletId: outletId || undefined,
       },
       include: { drug: true },
       orderBy: { expiredDate: 'asc' },
@@ -134,11 +140,16 @@ export class DrugsService {
   }
 
   // CEK STOK KRITIS
-  async getLowStockDrugs() {
+  async getLowStockDrugs(outletId?: string) {
     const drugs = await this.prisma.drug.findMany({
       where: { isActive: true },
       include: {
-        batches: { where: { stock: { gt: 0 } } },
+        batches: {
+          where: {
+            stock: { gt: 0 },
+            outletId: outletId || undefined,
+          },
+        },
       },
     });
 
@@ -149,7 +160,7 @@ export class DrugsService {
   }
 
   // Alert stok menipis & kadaluarsa
-  async getAlerts() {
+  async getAlerts(outletId?: string) {
     const ninetyDaysFromNow = new Date();
     ninetyDaysFromNow.setDate(ninetyDaysFromNow.getDate() + 90);
 
@@ -157,7 +168,10 @@ export class DrugsService {
       where: { isActive: true },
       include: {
         batches: {
-          where: { stock: { gt: 0 } },
+          where: {
+            stock: { gt: 0 },
+            outletId: outletId || undefined,
+          },
         },
       },
     });

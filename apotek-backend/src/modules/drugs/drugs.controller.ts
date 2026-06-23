@@ -1,6 +1,6 @@
 import {
   Controller, Get, Post, Put, Patch, Delete,
-  Body, Param, Query, UseGuards,
+  Body, Param, Query, UseGuards, Request,
 } from '@nestjs/common';
 import { DrugsService } from './drugs.service';
 import { AuthGuard } from '@nestjs/passport';
@@ -11,23 +11,44 @@ export class DrugsController {
   constructor(private drugsService: DrugsService) {}
 
   @Get()
-  findAll(@Query('search') search?: string, @Query('category') category?: string) {
-    return this.drugsService.findAll(search, category);
+  findAll(
+    @Request() req: any,
+    @Query('search') search?: string,
+    @Query('category') category?: string,
+    @Query('outletId') outletId?: string,
+  ) {
+    let targetOutletId = outletId;
+    if (req.user.role !== 'SUPER_ADMIN' && req.user.role !== 'PASIEN') {
+      targetOutletId = req.user.outletId;
+    }
+    return this.drugsService.findAll(search, category, targetOutletId);
   }
 
   @Get('expiring')
-  getExpiring(@Query('days') days?: string) {
-    return this.drugsService.getExpiringDrugs(days ? parseInt(days) : 90);
+  getExpiring(@Request() req: any, @Query('days') days?: string) {
+    let targetOutletId = undefined;
+    if (req.user.role !== 'SUPER_ADMIN' && req.user.role !== 'PASIEN') {
+      targetOutletId = req.user.outletId;
+    }
+    return this.drugsService.getExpiringDrugs(days ? parseInt(days) : 90, targetOutletId);
   }
 
   @Get('low-stock')
-  getLowStock() {
-    return this.drugsService.getLowStockDrugs();
+  getLowStock(@Request() req: any) {
+    let targetOutletId = undefined;
+    if (req.user.role !== 'SUPER_ADMIN' && req.user.role !== 'PASIEN') {
+      targetOutletId = req.user.outletId;
+    }
+    return this.drugsService.getLowStockDrugs(targetOutletId);
   }
 
   @Get('alerts')
-  getAlerts() {
-    return this.drugsService.getAlerts();
+  getAlerts(@Request() req: any) {
+    let targetOutletId = undefined;
+    if (req.user.role !== 'SUPER_ADMIN' && req.user.role !== 'PASIEN') {
+      targetOutletId = req.user.outletId;
+    }
+    return this.drugsService.getAlerts(targetOutletId);
   }
 
   @Get(':id')
@@ -51,7 +72,11 @@ export class DrugsController {
   }
 
   @Post('batch')
-  addBatch(@Body() body: any) {
-    return this.drugsService.addBatch(body);
+  addBatch(@Request() req: any, @Body() body: any) {
+    const outletId = req.user.role === 'SUPER_ADMIN' ? body.outletId : req.user.outletId;
+    return this.drugsService.addBatch({
+      ...body,
+      outletId,
+    });
   }
 }

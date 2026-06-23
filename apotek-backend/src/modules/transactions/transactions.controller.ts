@@ -25,15 +25,25 @@ export class TransactionsController {
 
   @Get()
   findAll(
+    @Request() req: any,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
+    @Query('outletId') outletId?: string,
   ) {
-    return this.transactionsService.findAll(startDate, endDate);
+    let targetOutletId = outletId;
+    if (req.user.role !== 'SUPER_ADMIN') {
+      targetOutletId = req.user.outletId;
+    }
+    return this.transactionsService.findAll(startDate, endDate, targetOutletId);
   }
 
   @Get('summary/today')
-  getDailySummary() {
-    return this.transactionsService.getDailySummary();
+  getDailySummary(@Request() req: any) {
+    let targetOutletId = undefined;
+    if (req.user.role !== 'SUPER_ADMIN') {
+      targetOutletId = req.user.outletId;
+    }
+    return this.transactionsService.getDailySummary(targetOutletId);
   }
 
   @Get(':id')

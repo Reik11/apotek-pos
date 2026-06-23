@@ -22,6 +22,7 @@ export class OrdersController {
       prescriptionId: body.prescriptionId,
       shippingFee: body.shippingFee,
       paymentMethod: body.paymentMethod,
+      outletId: body.outletId,
     });
   }
 
@@ -33,8 +34,12 @@ export class OrdersController {
 
   // Admin/apoteker lihat semua order
   @Get()
-  findAll(@Query('status') status?: string) {
-    return this.ordersService.findAll(status);
+  findAll(@Request() req: any, @Query('status') status?: string) {
+    let targetOutletId = undefined;
+    if (req.user.role !== 'SUPER_ADMIN' && req.user.role !== 'PASIEN') {
+      targetOutletId = req.user.outletId;
+    }
+    return this.ordersService.findAll(status, targetOutletId);
   }
 
   // Pasien lihat order miliknya

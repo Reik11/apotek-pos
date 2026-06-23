@@ -15,6 +15,7 @@ import { UserReportsModule } from './modules/user-reports/user-reports.module';
 import { SuppliersModule } from './modules/suppliers/suppliers.module';
 import { PurchaseOrdersModule } from './modules/purchase-orders/purchase-orders.module';
 import { ShiftsModule } from './modules/shifts/shifts.module';
+import { OutletsModule } from './modules/outlets/outlets.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { ShiftsModule } from './modules/shifts/shifts.module';
     SuppliersModule,
     PurchaseOrdersModule,
     ShiftsModule,
+    OutletsModule,
   ],
 })
 export class AppModule {}

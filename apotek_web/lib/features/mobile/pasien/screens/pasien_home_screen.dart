@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../../../core/api/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../features/auth/providers/auth_provider.dart';
+import '../../../../features/outlets/providers/outlets_provider.dart';
 import '../../profile/profile_screen.dart';
 import 'prescription_screen.dart';
 import 'address_screen.dart';
@@ -52,7 +53,11 @@ class _PasienHomeScreenState extends ConsumerState<PasienHomeScreen> {
 
   Future<void> _loadInitialData() async {
     try {
-      final response = await ApiClient.createDio().get('/drugs');
+      final outletState = ref.read(outletsProvider);
+      final outletId = outletState.selectedOutlet?['id'];
+      final drugUrl = outletId != null ? '/drugs?outletId=$outletId' : '/drugs';
+
+      final response = await ApiClient.createDio().get(drugUrl);
       final addrResponse = await ApiClient.createDio().get('/addresses/my');
       final rxResponse = await ApiClient.createDio().get('/prescriptions/my');
       if (mounted) {
@@ -131,7 +136,10 @@ class _PasienHomeScreenState extends ConsumerState<PasienHomeScreen> {
     }
     setState(() => isSearching = true);
     try {
-      final response = await ApiClient.createDio().get('/drugs?search=$query');
+      final outletState = ref.read(outletsProvider);
+      final outletId = outletState.selectedOutlet?['id'];
+      final searchUrl = outletId != null ? '/drugs?search=$query&outletId=$outletId' : '/drugs?search=$query';
+      final response = await ApiClient.createDio().get(searchUrl);
       setState(() {
         searchResults = response.data as List? ?? [];
         isSearching = false;
@@ -333,6 +341,9 @@ class _PasienHomeScreenState extends ConsumerState<PasienHomeScreen> {
               })
           .toList();
 
+      final outletState = ref.read(outletsProvider);
+      final outletId = outletState.selectedOutlet?['id'];
+
       final response = await ApiClient.createDio().post('/orders', data: {
         'items': items,
         'deliveryMethod': _deliveryMethod,
@@ -341,6 +352,7 @@ class _PasienHomeScreenState extends ConsumerState<PasienHomeScreen> {
         'shippingFee': shippingFee,
         'paymentMethod': _paymentMethod,
         'paymentProof': paymentProof,
+        'outletId': outletId,
       });
 
       final order = response.data;
@@ -427,6 +439,11 @@ class _PasienHomeScreenState extends ConsumerState<PasienHomeScreen> {
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(authProvider).user;
+    final outletState = ref.watch(outletsProvider);
+
+    if (outletState.selectedOutlet == null) {
+      return _buildOutletSelectionScreen(outletState);
+    }
     
     final List<Widget> pages = [
       _buildHomeTab(),
@@ -492,12 +509,15 @@ class _PasienHomeScreenState extends ConsumerState<PasienHomeScreen> {
   }
 
   Widget _buildHeader(String userName) {
+    final outletState = ref.watch(outletsProvider);
+    final selectedOutletName = outletState.selectedOutlet?['name'] ?? 'Pilih Cabang';
+
     return Container(
       padding: EdgeInsets.only(
-        top: MediaQuery.of(context).padding.top + 24,
+        top: MediaQuery.of(context).padding.top + 20,
         left: 24,
         right: 24,
-        bottom: 24,
+        bottom: 20,
       ),
       decoration: const BoxDecoration(
         color: AppTheme.primary,
@@ -506,31 +526,70 @@ class _PasienHomeScreenState extends ConsumerState<PasienHomeScreen> {
           bottomRight: Radius.circular(32),
         ),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Halo, $userName 👋',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Halo, $userName 👋',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Mau cari obat apa hari ini?',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Material(
+                color: Colors.white.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(20),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(20),
+                  onTap: () {
+                    ref.read(outletsProvider.notifier).selectOutlet(null);
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.storefront_outlined, color: Colors.white, size: 16),
+                        const SizedBox(width: 6),
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 100),
+                          child: Text(
+                            selectedOutletName,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(Icons.edit_location_outlined, color: Colors.white, size: 14),
+                      ],
+                    ),
                   ),
                 ),
-                const SizedBox(height: 4),
-                const Text(
-                  'Mau cari obat apa hari ini?',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 14,
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ],
       ),
@@ -1714,6 +1773,206 @@ class _PasienHomeScreenState extends ConsumerState<PasienHomeScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildOutletSelectionScreen(OutletsState state) {
+    if (state.isLoading) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    if (state.error != null) {
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                'Terjadi kesalahan: ${state.error}',
+                style: const TextStyle(color: AppTheme.danger),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () => ref.read(outletsProvider.notifier).loadOutlets(),
+                child: const Text('Coba Lagi'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final outlets = state.outlets;
+
+    return Scaffold(
+      backgroundColor: AppTheme.background,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.store_outlined,
+                      color: AppTheme.primary,
+                      size: 28,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Pilih Cabang Apotek',
+                          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.textPrimary,
+                              ),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Pilih apotek untuk belanja obat & tebus resep',
+                          style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 32),
+              Expanded(
+                child: outlets.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.storefront_outlined, size: 64, color: AppTheme.textHint),
+                            const SizedBox(height: 16),
+                            const Text(
+                              'Belum ada cabang apotek terdaftar.',
+                              style: TextStyle(color: AppTheme.textSecondary),
+                            ),
+                          ],
+                        ),
+                      )
+                    : ListView.separated(
+                        itemCount: outlets.length,
+                        separatorBuilder: (ctx, index) => const SizedBox(height: 16),
+                        itemBuilder: (ctx, index) {
+                          final outlet = outlets[index];
+                          return Card(
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              side: BorderSide(
+                                color: AppTheme.border.withOpacity(0.6),
+                                width: 1.5,
+                              ),
+                            ),
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(16),
+                              onTap: () {
+                                ref.read(outletsProvider.notifier).selectOutlet(outlet);
+                                _loadInitialData(); // Reload drugs for selected outlet
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.all(20.0),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            outlet['name'] ?? '-',
+                                            style: const TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                              color: AppTheme.textPrimary,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Row(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              const Icon(
+                                                Icons.location_on_outlined,
+                                                size: 16,
+                                                color: AppTheme.textSecondary,
+                                              ),
+                                              const SizedBox(width: 6),
+                                              Expanded(
+                                                child: Text(
+                                                  outlet['address'] ?? '-',
+                                                  style: const TextStyle(
+                                                    fontSize: 13,
+                                                    color: AppTheme.textSecondary,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          if (outlet['phone'] != null && (outlet['phone'] as String).isNotEmpty) ...[
+                                            const SizedBox(height: 6),
+                                            Row(
+                                              children: [
+                                                const Icon(
+                                                  Icons.phone_outlined,
+                                                  size: 16,
+                                                  color: AppTheme.textSecondary,
+                                                ),
+                                                const SizedBox(width: 6),
+                                                Text(
+                                                  outlet['phone'],
+                                                  style: const TextStyle(
+                                                    fontSize: 13,
+                                                    color: AppTheme.textSecondary,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Container(
+                                      padding: const EdgeInsets.all(10),
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.primary.withOpacity(0.08),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.chevron_right_rounded,
+                                        color: AppTheme.primary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

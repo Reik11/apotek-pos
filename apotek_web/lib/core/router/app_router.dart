@@ -12,6 +12,7 @@ import '../../features/reports/screens/user_reports_screen.dart';
 import '../../features/users/screens/users_screen.dart';
 import '../../features/suppliers/screens/suppliers_screen.dart';
 import '../../features/purchase_orders/screens/purchase_orders_screen.dart';
+import '../../features/outlets/screens/outlets_screen.dart';
 
 // Profile
 import '../../features/auth/screens/profile_screen.dart';
@@ -69,6 +70,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/profile',
         builder: (context, state) => const ProfileScreen(),
+      ),
+      GoRoute(
+        path: '/outlets',
+        builder: (context, state) => const OutletsScreen(),
       ),
 
       // ===== MOBILE ROUTES =====

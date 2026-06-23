@@ -21,6 +21,8 @@ model User {
   phone        String?
   avatarUrl    String?
   shift        StafShift @default(OFF)
+  outletId     String?
+  outlet       Outlet?   @relation(fields: [outletId], references: [id])
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -106,6 +108,8 @@ model DrugBatch {
   receivedDate DateTime  @default(now())
   supplierId   String?
   supplier     Supplier? @relation(fields: [supplierId], references: [id])
+  outletId     String?
+  outlet       Outlet?   @relation(fields: [outletId], references: [id])
   createdAt    DateTime  @default(now())
 
   transactionItems TransactionItem[]
@@ -145,6 +149,8 @@ model Transaction {
   notes         String?
   shiftId       String?
   shift         CashShift?    @relation(fields: [shiftId], references: [id])
+  outletId      String?
+  outlet        Outlet?       @relation(fields: [outletId], references: [id])
   createdAt     DateTime      @default(now())
 
   items TransactionItem[]
@@ -196,6 +202,8 @@ model Order {
   address        Address?       @relation(fields: [addressId], references: [id])
   prescriptionId String?
   prescription   Prescription?  @relation(fields: [prescriptionId], references: [id])
+  outletId       String?
+  outlet         Outlet?        @relation(fields: [outletId], references: [id])
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
@@ -370,6 +378,8 @@ model CashShift {
   totalTransactions Int?
   status            ShiftStatus  @default(OPEN)
   notes             String?
+  outletId          String?
+  outlet            Outlet?      @relation(fields: [outletId], references: [id])
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
 
@@ -386,4 +396,24 @@ enum StafShift {
   SIANG
   MALAM
   OFF
+}
+
+// ==================
+// TABEL OUTLET / CABANG APOTEK
+// ==================
+model Outlet {
+  id        String   @id @default(uuid())
+  name      String
+  address   String
+  phone     String?
+  latitude  Float?
+  longitude Float?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users        User[]
+  batches      DrugBatch[]
+  transactions Transaction[]
+  orders       Order[]
+  shifts       CashShift[]
 }

@@ -15,6 +15,7 @@ export class OrdersService {
     prescriptionId?: string;
     shippingFee?: number;
     paymentMethod?: string;
+    outletId?: string;
   }) {
     // Validasi stok & hitung total
     let totalAmount = 0;
@@ -45,7 +46,10 @@ export class OrdersService {
         where: { id: item.drugId },
         include: {
           batches: {
-            where: { stock: { gt: 0 } },
+            where: {
+              stock: { gt: 0 },
+              outletId: data.outletId || undefined,
+            },
             orderBy: { expiredDate: 'asc' },
           },
         },
@@ -88,6 +92,7 @@ export class OrdersService {
         deliveryMethod: data.deliveryMethod || 'PICKUP',
         addressId: data.addressId,
         prescriptionId: data.prescriptionId,
+        outletId: data.outletId || null,
         items: { create: itemsData },
       },
       include: {
@@ -128,9 +133,12 @@ export class OrdersService {
   }
 
   // AMBIL SEMUA ORDER (ADMIN/APOTEKER)
-  async findAll(status?: string) {
+  async findAll(status?: string, outletId?: string) {
     return this.prisma.order.findMany({
-      where: { status: status as any },
+      where: {
+        status: status as any,
+        outletId: outletId || undefined,
+      },
       include: {
         items: { include: { drug: true } },
         patient: { select: { id: true, name: true, email: true } },
@@ -215,7 +223,11 @@ export class OrdersService {
     // Kurangi stok obat
     for (const item of order.items) {
       const batch = await this.prisma.drugBatch.findFirst({
-        where: { drugId: item.drugId, stock: { gte: item.quantity } },
+        where: {
+          drugId: item.drugId,
+          stock: { gte: item.quantity },
+          outletId: order.outletId || undefined,
+        },
         orderBy: { expiredDate: 'asc' },
       });
       if (batch) {

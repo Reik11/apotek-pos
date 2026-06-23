@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/main_layout.dart';
+import '../../auth/providers/auth_provider.dart';
+import '../../outlets/providers/outlets_provider.dart';
 import '../providers/users_provider.dart';
 
 class UsersScreen extends ConsumerStatefulWidget {
@@ -35,6 +37,8 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
   @override
   Widget build(BuildContext context) {
     final usersState = ref.watch(usersProvider);
+    final outletsState = ref.watch(outletsProvider);
+    final currentUser = ref.watch(authProvider).user;
     final filtered = usersState.users.where((u) {
       final q = _searchQuery.toLowerCase();
       return (u['name'] ?? '').toLowerCase().contains(q) ||
@@ -126,18 +130,19 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                             borderRadius: BorderRadius.circular(12),
                             child: Table(
                               columnWidths: const {
-                                0: FlexColumnWidth(2.5),
-                                1: FlexColumnWidth(2.5),
-                                2: FlexColumnWidth(1.5),
-                                3: FlexColumnWidth(1.2),
-                                4: FlexColumnWidth(1.5),
-                                5: FlexColumnWidth(1.8),
+                                0: FlexColumnWidth(2.2),
+                                1: FlexColumnWidth(2.2),
+                                2: FlexColumnWidth(1.2),
+                                3: FlexColumnWidth(1.8),
+                                4: FlexColumnWidth(1.0),
+                                5: FlexColumnWidth(1.2),
                                 6: FlexColumnWidth(1.5),
+                                7: FlexColumnWidth(1.5),
                               },
                               children: [
                                 TableRow(
                                   decoration: const BoxDecoration(color: AppTheme.primary),
-                                  children: ['Nama', 'Email', 'Role', 'Shift', 'Status', 'Terdaftar', 'Aksi']
+                                  children: ['Nama', 'Email', 'Role', 'Outlet', 'Shift', 'Status', 'Terdaftar', 'Aksi']
                                       .map((h) => Padding(
                                             padding: const EdgeInsets.all(12),
                                             child: Text(h,
@@ -207,6 +212,15 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                                             style: TextStyle(color: roleColor, fontSize: 11, fontWeight: FontWeight.w600),
                                             textAlign: TextAlign.center,
                                           ),
+                                        ),
+                                      ),
+                                      // Outlet
+                                      Padding(
+                                        padding: const EdgeInsets.all(12),
+                                        child: Text(
+                                          user['outlet']?['name'] ?? 'Global / Pusat',
+                                          style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                                          overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
                                       // Shift
@@ -325,7 +339,10 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
     final passCtrl = TextEditingController();
     String selectedRole = 'KASIR';
     String selectedShift = 'OFF';
+    String? selectedOutletId;
     bool obscure = true;
+
+    final outletsState = ref.read(outletsProvider);
 
     showDialog(
       context: context,
@@ -382,6 +399,28 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                     items: _shifts.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
                     onChanged: (v) => setS(() => selectedShift = v!),
                   ),
+                  if (ref.read(authProvider).user?.role == 'SUPER_ADMIN') ...[
+                    const SizedBox(height: 12),
+                    const Text('Outlet / Cabang', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                    const SizedBox(height: 6),
+                    DropdownButtonFormField<String?>(
+                      value: selectedOutletId,
+                      decoration: const InputDecoration(),
+                      items: [
+                        const DropdownMenuItem<String?>(
+                          value: null,
+                          child: Text('Global / Pusat'),
+                        ),
+                        ...outletsState.outlets.map(
+                          (o) => DropdownMenuItem<String?>(
+                            value: o['id'] as String?,
+                            child: Text(o['name'] ?? '-'),
+                          ),
+                        ),
+                      ],
+                      onChanged: (v) => setS(() => selectedOutletId = v),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -398,6 +437,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                   'role': selectedRole,
                   'shift': selectedShift,
                   'phone': phoneCtrl.text.isEmpty ? null : phoneCtrl.text,
+                  'outletId': selectedOutletId,
                 });
                 if (ok && ctx.mounted) {
                   Navigator.pop(ctx);
@@ -422,6 +462,9 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
     String selectedRole = user['role'] ?? 'KASIR';
     String selectedShift = user['shift'] ?? 'OFF';
     bool isActive = user['isActive'] ?? true;
+    String? selectedOutletId = user['outletId'];
+
+    final outletsState = ref.read(outletsProvider);
 
     showDialog(
       context: context,
@@ -462,6 +505,28 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                     items: _shifts.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
                     onChanged: (v) => setS(() => selectedShift = v!),
                   ),
+                  if (ref.read(authProvider).user?.role == 'SUPER_ADMIN') ...[
+                    const SizedBox(height: 12),
+                    const Text('Outlet / Cabang', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                    const SizedBox(height: 6),
+                    DropdownButtonFormField<String?>(
+                      value: selectedOutletId,
+                      decoration: const InputDecoration(),
+                      items: [
+                        const DropdownMenuItem<String?>(
+                          value: null,
+                          child: Text('Global / Pusat'),
+                        ),
+                        ...outletsState.outlets.map(
+                          (o) => DropdownMenuItem<String?>(
+                            value: o['id'] as String?,
+                            child: Text(o['name'] ?? '-'),
+                          ),
+                        ),
+                      ],
+                      onChanged: (v) => setS(() => selectedOutletId = v),
+                    ),
+                  ],
                   const SizedBox(height: 12),
                   Row(
                     children: [
@@ -488,6 +553,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                   'shift': selectedShift,
                   'phone': phoneCtrl.text.isEmpty ? null : phoneCtrl.text,
                   'isActive': isActive,
+                  'outletId': selectedOutletId,
                 });
                 if (ok && ctx.mounted) {
                   Navigator.pop(ctx);

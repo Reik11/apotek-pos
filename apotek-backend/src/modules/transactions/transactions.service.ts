@@ -15,6 +15,12 @@ export class TransactionsService {
     discountValue?: number;
     notes?: string;
   }) {
+    // Ambil profile cashier & outletId
+    const cashier = await this.prisma.user.findUnique({
+      where: { id: data.cashierId },
+      select: { outletId: true },
+    });
+
     // 0. Cek shift aktif kasir
     const activeShift = await this.prisma.cashShift.findFirst({
       where: { cashierId: data.cashierId, status: 'OPEN' },
@@ -42,13 +48,17 @@ export class TransactionsService {
       });
       if (!drug) throw new NotFoundException(`Obat ${item.drugId} tidak ditemukan`);
 
-      // Ambil batch dengan stok tersedia (FIFO - expired terdekat dulu)
+      // Ambil batch dengan stok tersedia di outlet cashier (FIFO - expired terdekat dulu)
       const batch = await this.prisma.drugBatch.findFirst({
-        where: { drugId: item.drugId, stock: { gte: item.quantity } },
+        where: {
+          drugId: item.drugId,
+          stock: { gte: item.quantity },
+          outletId: cashier?.outletId || null,
+        },
         orderBy: { expiredDate: 'asc' },
       });
       if (!batch) {
-        throw new BadRequestException(`Stok ${drug.name} tidak cukup`);
+        throw new BadRequestException(`Stok ${drug.name} tidak cukup di cabang ini`);
       }
 
       const itemSubtotal = drug.sellPrice * item.quantity;
@@ -97,6 +107,7 @@ export class TransactionsService {
         amountPaid: data.amountPaid,
         change,
         notes: data.notes,
+        outletId: cashier?.outletId || null,
         items: {
           create: itemsWithBatch,
         },
@@ -116,13 +127,14 @@ export class TransactionsService {
   }
 
   // AMBIL SEMUA TRANSAKSI
-  async findAll(startDate?: string, endDate?: string) {
+  async findAll(startDate?: string, endDate?: string, outletId?: string) {
     return this.prisma.transaction.findMany({
       where: {
         createdAt: {
           gte: startDate ? new Date(startDate) : undefined,
           lte: endDate ? new Date(endDate) : undefined,
         },
+        outletId: outletId || undefined,
       },
       include: {
         cashier: { select: { id: true, name: true } },
@@ -146,7 +158,7 @@ export class TransactionsService {
   }
 
   // RINGKASAN PENJUALAN HARI INI
-  async getDailySummary() {
+  async getDailySummary(outletId?: string) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
@@ -156,6 +168,7 @@ export class TransactionsService {
       where: {
         createdAt: { gte: today, lt: tomorrow },
         status: 'COMPLETED',
+        outletId: outletId || undefined,
       },
     });
 

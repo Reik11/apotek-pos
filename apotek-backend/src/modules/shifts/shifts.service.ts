@@ -23,12 +23,18 @@ export class ShiftsService {
       throw new BadRequestException('Anda sudah memiliki shift kasir yang sedang aktif');
     }
 
+    const cashier = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { outletId: true },
+    });
+
     return this.prisma.cashShift.create({
       data: {
         cashierId: userId,
         startBalance: data.startBalance,
         status: 'OPEN',
         notes: data.notes,
+        outletId: cashier?.outletId || null,
       },
     });
   }

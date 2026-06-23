@@ -6,7 +6,7 @@ export class ReportsService {
   constructor(private prisma: PrismaService) {}
 
   // LAPORAN PENJUALAN
-  async getSalesReport(period: 'daily' | 'weekly' | 'monthly' | 'yearly') {
+  async getSalesReport(period: 'daily' | 'weekly' | 'monthly' | 'yearly', outletId?: string) {
     const now = new Date();
     let startDate: Date;
 
@@ -29,6 +29,7 @@ export class ReportsService {
       where: {
         createdAt: { gte: startDate },
         status: 'COMPLETED',
+        outletId: outletId || undefined,
       },
       include: {
         items: { include: { drug: true } },
@@ -94,11 +95,17 @@ export class ReportsService {
   }
 
   // LAPORAN INVENTARIS
-  async getInventoryReport() {
+  async getInventoryReport(outletId?: string) {
     const drugs = await this.prisma.drug.findMany({
       where: { isActive: true },
       include: {
-        batches: { orderBy: { expiredDate: 'asc' } },
+        batches: {
+          where: {
+            stock: { gt: 0 },
+            outletId: outletId || undefined,
+          },
+          orderBy: { expiredDate: 'asc' },
+        },
       },
       orderBy: { name: 'asc' },
     });
@@ -139,7 +146,7 @@ export class ReportsService {
   }
 
   // LAPORAN OBAT KADALUARSA
-  async getExpiryReport() {
+  async getExpiryReport(outletId?: string) {
     const now = new Date();
 
     const in30Days = new Date();
@@ -152,6 +159,7 @@ export class ReportsService {
       where: {
         expiredDate: { lte: in90Days },
         stock: { gt: 0 },
+        outletId: outletId || undefined,
       },
       include: { drug: true },
       orderBy: { expiredDate: 'asc' },
@@ -202,7 +210,7 @@ export class ReportsService {
   }
 
   // DASHBOARD SUMMARY
-  async getDashboardSummary() {
+  async getDashboardSummary(outletId?: string) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
@@ -216,18 +224,29 @@ export class ReportsService {
       where: {
         createdAt: { gte: today, lt: tomorrow },
         status: 'COMPLETED',
+        outletId: outletId || undefined,
       },
     });
 
     // Order pending
     const pendingOrders = await this.prisma.order.count({
-      where: { status: 'PENDING' },
+      where: {
+        status: 'PENDING',
+        outletId: outletId || undefined,
+      },
     });
 
     // Stok kritis
     const drugs = await this.prisma.drug.findMany({
       where: { isActive: true },
-      include: { batches: { where: { stock: { gt: 0 } } } },
+      include: {
+        batches: {
+          where: {
+            stock: { gt: 0 },
+            outletId: outletId || undefined,
+          },
+        },
+      },
     });
     const lowStockCount = drugs.filter((d) => {
       const total = d.batches.reduce((s, b) => s + b.stock, 0);
@@ -239,6 +258,7 @@ export class ReportsService {
       where: {
         expiredDate: { lte: in30Days },
         stock: { gt: 0 },
+        outletId: outletId || undefined,
       },
     });
 
@@ -259,6 +279,7 @@ export class ReportsService {
         where: {
           createdAt: { gte: dayStart, lt: dayEnd },
           status: 'COMPLETED',
+          outletId: outletId || undefined,
         },
         select: { totalAmount: true },
       });
@@ -272,6 +293,9 @@ export class ReportsService {
     // 5 transaksi terbaru
     const recentTransactions = await this.prisma.transaction.findMany({
       take: 5,
+      where: {
+        outletId: outletId || undefined,
+      },
       orderBy: { createdAt: 'desc' },
       include: {
         cashier: { select: { name: true } },

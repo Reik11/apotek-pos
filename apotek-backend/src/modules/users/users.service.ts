@@ -50,8 +50,13 @@ export class UsersService {
   }
 
   // LIST SEMUA PENGGUNA (Admin only)
-  async findAll() {
+  async findAll(role?: string, outletId?: string) {
+    const where: any = {};
+    if (role !== 'SUPER_ADMIN' && outletId) {
+      where.outletId = outletId;
+    }
     return this.prisma.user.findMany({
+      where,
       select: {
         id: true,
         name: true,
@@ -60,6 +65,8 @@ export class UsersService {
         phone: true,
         isActive: true,
         shift: true,
+        outletId: true,
+        outlet: { select: { id: true, name: true } },
         createdAt: true,
       },
       orderBy: { createdAt: 'desc' },
@@ -74,13 +81,23 @@ export class UsersService {
     role: string;
     phone?: string;
     shift?: string;
+    outletId?: string;
   }) {
     const existing = await this.prisma.user.findUnique({ where: { email: data.email } });
     if (existing) throw new ConflictException('Email sudah digunakan');
     const hashed = await bcrypt.hash(data.password, 10);
     return this.prisma.user.create({
       data: { ...data, password: hashed } as any,
-      select: { id: true, name: true, email: true, role: true, shift: true, createdAt: true },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        shift: true,
+        outletId: true,
+        outlet: { select: { id: true, name: true } },
+        createdAt: true,
+      },
     });
   }
 
@@ -100,6 +117,7 @@ export class UsersService {
     phone?: string;
     shift?: string;
     isActive?: boolean;
+    outletId?: string;
   }) {
     const user = await this.prisma.user.findUnique({ where: { id } });
     if (!user) throw new NotFoundException('User tidak ditemukan');
@@ -122,6 +140,8 @@ export class UsersService {
         phone: true,
         isActive: true,
         shift: true,
+        outletId: true,
+        outlet: { select: { id: true, name: true } },
         createdAt: true,
       },
     });
