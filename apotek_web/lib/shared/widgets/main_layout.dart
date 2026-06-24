@@ -16,6 +16,12 @@ class MainLayout extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Cek apakah sudah bersarang di dalam MainLayout terluar
+    final isNested = MainLayoutScope.of(context) != null;
+    if (isNested) {
+      return child;
+    }
+
     final authState = ref.watch(authProvider);
     final user = authState.user;
 
@@ -27,7 +33,11 @@ class MainLayout extends ConsumerWidget {
           _buildSidebar(context, ref, user),
 
           // ===== MAIN CONTENT =====
-          Expanded(child: child),
+          Expanded(
+            child: MainLayoutScope(
+              child: child,
+            ),
+          ),
         ],
       ),
     );
@@ -362,4 +372,18 @@ class _NavItemWidget extends StatelessWidget {
       ),
     );
   }
+}
+
+class MainLayoutScope extends InheritedWidget {
+  const MainLayoutScope({
+    super.key,
+    required super.child,
+  });
+
+  static MainLayoutScope? of(BuildContext context) {
+    return context.dependOnInheritedWidgetOfExactType<MainLayoutScope>();
+  }
+
+  @override
+  bool updateShouldNotify(MainLayoutScope oldWidget) => false;
 }

@@ -21,6 +21,9 @@ import '../../features/auth/screens/profile_screen.dart';
 import '../../features/mobile/apoteker/screens/apoteker_home_screen.dart';
 import '../../features/mobile/pasien/screens/pasien_home_screen.dart';
 
+// Layout
+import '../../shared/widgets/main_layout.dart';
+
 final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: '/login',
@@ -34,46 +37,56 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const RegisterScreen(),
       ),
 
-      // ===== WEB ROUTES =====
-      GoRoute(
-        path: '/dashboard',
-        builder: (context, state) => const DashboardScreen(),
-      ),
-      GoRoute(
-        path: '/kasir',
-        builder: (context, state) => const KasirScreen(),
-      ),
-      GoRoute(
-        path: '/inventory',
-        builder: (context, state) => const InventoryScreen(),
-      ),
-      GoRoute(
-        path: '/reports',
-        builder: (context, state) => const ReportsScreen(),
-      ),
-      GoRoute(
-        path: '/admin-reports',
-        builder: (context, state) => const UserReportsScreen(),
-      ),
-      GoRoute(
-        path: '/users',
-        builder: (context, state) => const UsersScreen(),
-      ),
-      GoRoute(
-        path: '/suppliers',
-        builder: (context, state) => const SuppliersScreen(),
-      ),
-      GoRoute(
-        path: '/purchase-orders',
-        builder: (context, state) => const PurchaseOrdersScreen(),
-      ),
-      GoRoute(
-        path: '/profile',
-        builder: (context, state) => const ProfileScreen(),
-      ),
-      GoRoute(
-        path: '/outlets',
-        builder: (context, state) => const OutletsScreen(),
+      // ===== WEB ROUTES (SHELL) =====
+      ShellRoute(
+        builder: (context, state, child) {
+          return MainLayout(
+            currentRoute: state.matchedLocation,
+            child: child,
+          );
+        },
+        routes: [
+          GoRoute(
+            path: '/dashboard',
+            builder: (context, state) => const DashboardScreen(),
+          ),
+          GoRoute(
+            path: '/kasir',
+            builder: (context, state) => const KasirScreen(),
+          ),
+          GoRoute(
+            path: '/inventory',
+            builder: (context, state) => const InventoryScreen(),
+          ),
+          GoRoute(
+            path: '/reports',
+            builder: (context, state) => const ReportsScreen(),
+          ),
+          GoRoute(
+            path: '/admin-reports',
+            builder: (context, state) => const UserReportsScreen(),
+          ),
+          GoRoute(
+            path: '/users',
+            builder: (context, state) => const UsersScreen(),
+          ),
+          GoRoute(
+            path: '/suppliers',
+            builder: (context, state) => const SuppliersScreen(),
+          ),
+          GoRoute(
+            path: '/purchase-orders',
+            builder: (context, state) => const PurchaseOrdersScreen(),
+          ),
+          GoRoute(
+            path: '/profile',
+            builder: (context, state) => const ProfileScreen(),
+          ),
+          GoRoute(
+            path: '/outlets',
+            builder: (context, state) => const OutletsScreen(),
+          ),
+        ],
       ),
 
       // ===== MOBILE ROUTES =====
