@@ -492,15 +492,11 @@ class _PasienHomeScreenState extends ConsumerState<PasienHomeScreen> {
             color: AppTheme.background,
             child: Column(
               children: [
-                if (_currentIndex == 0) _buildHeader(user?.name ?? 'Pasien'),
+                _buildHeader(user?.name ?? 'Pasien'),
                 Expanded(
-                  child: SafeArea(
-                    top: _currentIndex != 0 && _currentIndex != 4,
-                    bottom: false,
-                    child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 300),
-                      child: pages[_currentIndex],
-                    ),
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 300),
+                    child: pages[_currentIndex],
                   ),
                 ),
                 _buildBottomNav(),
@@ -523,12 +519,14 @@ class _PasienHomeScreenState extends ConsumerState<PasienHomeScreen> {
         right: 24,
         bottom: 20,
       ),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppTheme.primary,
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(32),
-          bottomRight: Radius.circular(32),
-        ),
+        borderRadius: _currentIndex == 4
+            ? null
+            : const BorderRadius.only(
+                bottomLeft: Radius.circular(32),
+                bottomRight: Radius.circular(32),
+              ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

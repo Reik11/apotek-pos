@@ -69,9 +69,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             Container(
               width: double.infinity,
               padding: EdgeInsets.only(
-                top: widget.isFromBottomNav
-                    ? MediaQuery.of(context).padding.top + 32
-                    : 32,
+                top: widget.isFromBottomNav ? 8 : 32,
                 bottom: 32,
               ),
               decoration: const BoxDecoration(
