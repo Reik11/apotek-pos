@@ -68,7 +68,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             // ===== HEADER PROFIL =====
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 32),
+              padding: EdgeInsets.only(
+                top: widget.isFromBottomNav
+                    ? MediaQuery.of(context).padding.top + 32
+                    : 32,
+                bottom: 32,
+              ),
               decoration: const BoxDecoration(
                 color: AppTheme.primary,
                 borderRadius: BorderRadius.only(

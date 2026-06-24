@@ -492,11 +492,15 @@ class _PasienHomeScreenState extends ConsumerState<PasienHomeScreen> {
             color: AppTheme.background,
             child: Column(
               children: [
-                _buildHeader(user?.name ?? 'Pasien'),
+                if (_currentIndex == 0) _buildHeader(user?.name ?? 'Pasien'),
                 Expanded(
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 300),
-                    child: pages[_currentIndex],
+                  child: SafeArea(
+                    top: _currentIndex != 0 && _currentIndex != 4,
+                    bottom: false,
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 300),
+                      child: pages[_currentIndex],
+                    ),
                   ),
                 ),
                 _buildBottomNav(),
