@@ -408,6 +408,7 @@ model Outlet {
   phone     String?
   latitude  Float?
   longitude Float?
+  logoUrl   String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

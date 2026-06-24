@@ -587,9 +587,30 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
               pw.Center(
                 child: pw.Column(
                   children: [
-                    pw.Text('APOTEK POS INDONESIA', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9)),
-                    pw.Text('Jl. Sehat Selalu No. 99, Depok', style: pw.TextStyle(fontSize: 6)),
-                    pw.Text('Telp: 021-98765432', style: pw.TextStyle(fontSize: 6)),
+                    if (tx['outlet']?['logoUrl'] != null && (tx['outlet']?['logoUrl'] as String).isNotEmpty)
+                      pw.Container(
+                        margin: const pw.EdgeInsets.only(bottom: 4),
+                        width: 24,
+                        height: 24,
+                        child: pw.Image(
+                          pw.InternetImage(tx['outlet']['logoUrl']),
+                        ),
+                      ),
+                    pw.Text(
+                      tx['outlet']?['name']?.toString().toUpperCase() ?? 'APOTEK POS INDONESIA',
+                      style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8),
+                      textAlign: pw.TextAlign.center,
+                    ),
+                    pw.Text(
+                      tx['outlet']?['address']?.toString() ?? 'Jl. Sehat Selalu No. 99, Depok',
+                      style: pw.TextStyle(fontSize: 5),
+                      textAlign: pw.TextAlign.center,
+                    ),
+                    pw.Text(
+                      tx['outlet']?['phone'] != null ? 'Telp: ${tx['outlet']['phone']}' : 'Telp: 021-98765432',
+                      style: pw.TextStyle(fontSize: 5),
+                      textAlign: pw.TextAlign.center,
+                    ),
                     pw.Text('-------------------------------------', style: pw.TextStyle(fontSize: 8)),
                   ],
                 ),

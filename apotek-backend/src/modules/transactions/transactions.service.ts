@@ -112,7 +112,10 @@ export class TransactionsService {
           create: itemsWithBatch,
         },
       },
-      include: { items: { include: { drug: true } } },
+      include: {
+        items: { include: { drug: true } },
+        outlet: true,
+      },
     });
 
     // Kurangi stok setiap batch
@@ -151,6 +154,7 @@ export class TransactionsService {
       include: {
         cashier: { select: { id: true, name: true } },
         items: { include: { drug: true } },
+        outlet: true,
       },
     });
     if (!tx) throw new NotFoundException('Transaksi tidak ditemukan');
@@ -209,6 +213,7 @@ export class TransactionsService {
         include: {
           cashier: { select: { id: true, name: true } },
           items: { include: { drug: true } },
+          outlet: true,
         },
       });
     });

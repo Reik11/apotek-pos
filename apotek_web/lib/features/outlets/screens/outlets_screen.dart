@@ -115,17 +115,18 @@ class _OutletsScreenState extends ConsumerState<OutletsScreen> {
                             borderRadius: BorderRadius.circular(12),
                             child: Table(
                               columnWidths: const {
-                                0: FlexColumnWidth(2.5),
-                                1: FlexColumnWidth(4.5),
-                                2: FlexColumnWidth(2.0),
-                                3: FlexColumnWidth(1.5),
-                                4: FlexColumnWidth(1.5),
-                                5: FlexColumnWidth(1.5),
+                                0: FlexColumnWidth(1.2), // Logo
+                                1: FlexColumnWidth(2.5), // Nama Outlet
+                                2: FlexColumnWidth(4.5), // Alamat
+                                3: FlexColumnWidth(2.0), // No. Telepon
+                                4: FlexColumnWidth(1.5), // Latitude
+                                5: FlexColumnWidth(1.5), // Longitude
+                                6: FlexColumnWidth(1.5), // Aksi
                               },
                               children: [
                                 TableRow(
                                   decoration: const BoxDecoration(color: AppTheme.primary),
-                                  children: ['Nama Outlet', 'Alamat', 'No. Telepon', 'Latitude', 'Longitude', 'Aksi']
+                                  children: ['Logo', 'Nama Outlet', 'Alamat', 'No. Telepon', 'Latitude', 'Longitude', 'Aksi']
                                       .map((h) => Padding(
                                             padding: const EdgeInsets.all(12),
                                             child: Text(h,
@@ -145,6 +146,22 @@ class _OutletsScreenState extends ConsumerState<OutletsScreen> {
                                       color: i % 2 == 0 ? Colors.white : const Color(0xFFF8FAFC),
                                     ),
                                     children: [
+                                      // Logo
+                                      Padding(
+                                        padding: const EdgeInsets.all(12),
+                                        child: outlet['logoUrl'] != null && (outlet['logoUrl'] as String).isNotEmpty
+                                            ? ClipRRect(
+                                                borderRadius: BorderRadius.circular(6),
+                                                child: Image.network(
+                                                  outlet['logoUrl'],
+                                                  width: 32,
+                                                  height: 32,
+                                                  fit: BoxFit.cover,
+                                                  errorBuilder: (_, __, ___) => const Icon(Icons.storefront_outlined, color: AppTheme.primary, size: 20),
+                                                ),
+                                              )
+                                            : const Icon(Icons.storefront_outlined, color: AppTheme.primary, size: 20),
+                                      ),
                                       // Nama
                                       Padding(
                                         padding: const EdgeInsets.all(12),
@@ -247,6 +264,7 @@ class _OutletsScreenState extends ConsumerState<OutletsScreen> {
     final phoneCtrl = TextEditingController(text: outlet?['phone']);
     final latCtrl = TextEditingController(text: outlet?['latitude']?.toString());
     final lngCtrl = TextEditingController(text: outlet?['longitude']?.toString());
+    final logoCtrl = TextEditingController(text: outlet?['logoUrl']);
 
     showDialog(
       context: context,
@@ -270,6 +288,10 @@ class _OutletsScreenState extends ConsumerState<OutletsScreen> {
                 const Text('No. Telepon', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                 const SizedBox(height: 6),
                 TextField(controller: phoneCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(hintText: '021-xxxxxxx')),
+                const SizedBox(height: 12),
+                const Text('Tautan Logo Outlet (URL)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                const SizedBox(height: 6),
+                TextField(controller: logoCtrl, decoration: const InputDecoration(hintText: 'https://example.com/logo.png')),
                 const SizedBox(height: 12),
                 Row(
                   children: [
@@ -311,6 +333,7 @@ class _OutletsScreenState extends ConsumerState<OutletsScreen> {
                 'phone': phoneCtrl.text.isEmpty ? null : phoneCtrl.text,
                 'latitude': double.tryParse(latCtrl.text),
                 'longitude': double.tryParse(lngCtrl.text),
+                'logoUrl': logoCtrl.text.isEmpty ? null : logoCtrl.text,
               };
 
               final success = isEdit

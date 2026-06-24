@@ -11,6 +11,7 @@ export class OutletsService {
     phone?: string;
     latitude?: number;
     longitude?: number;
+    logoUrl?: string;
   }) {
     return this.prisma.outlet.create({
       data,
@@ -37,6 +38,7 @@ export class OutletsService {
     phone?: string;
     latitude?: number;
     longitude?: number;
+    logoUrl?: string;
   }) {
     await this.findOne(id);
     return this.prisma.outlet.update({

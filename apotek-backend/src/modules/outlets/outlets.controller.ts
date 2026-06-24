@@ -31,6 +31,7 @@ export class OutletsController {
       phone: body.phone,
       latitude: body.latitude ? parseFloat(body.latitude) : undefined,
       longitude: body.longitude ? parseFloat(body.longitude) : undefined,
+      logoUrl: body.logoUrl,
     });
   }
 
@@ -45,6 +46,7 @@ export class OutletsController {
       phone: body.phone,
       latitude: body.latitude ? parseFloat(body.latitude) : undefined,
       longitude: body.longitude ? parseFloat(body.longitude) : undefined,
+      logoUrl: body.logoUrl,
     });
   }
 
