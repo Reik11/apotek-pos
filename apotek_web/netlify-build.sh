@@ -21,4 +21,4 @@ echo "=== Get Dependencies ==="
 flutter pub get
 
 echo "=== Build Web ==="
-flutter build web --release
+flutter build web --release --no-tree-shake-icons

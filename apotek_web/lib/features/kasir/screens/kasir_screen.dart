@@ -573,6 +573,13 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
     final date = DateTime.parse(tx['createdAt']);
     final formattedDate = DateFormat('dd-MM-yyyy HH:mm').format(date);
 
+    pw.ImageProvider? logoImage;
+    if (tx['outlet']?['logoUrl'] != null && (tx['outlet']?['logoUrl'] as String).isNotEmpty) {
+      try {
+        logoImage = await networkImage(tx['outlet']['logoUrl']);
+      } catch (_) {}
+    }
+
     pdf.addPage(
       pw.Page(
         pageFormat: const PdfPageFormat(
@@ -587,14 +594,12 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
               pw.Center(
                 child: pw.Column(
                   children: [
-                    if (tx['outlet']?['logoUrl'] != null && (tx['outlet']?['logoUrl'] as String).isNotEmpty)
+                    if (logoImage != null)
                       pw.Container(
                         margin: const pw.EdgeInsets.only(bottom: 4),
                         width: 24,
                         height: 24,
-                        child: pw.Image(
-                          pw.InternetImage(tx['outlet']['logoUrl']),
-                        ),
+                        child: pw.Image(logoImage),
                       ),
                     pw.Text(
                       tx['outlet']?['name']?.toString().toUpperCase() ?? 'APOTEK POS INDONESIA',
