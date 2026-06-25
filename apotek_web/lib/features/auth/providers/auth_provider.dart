@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -7,12 +8,14 @@ import '../../../shared/models/user_model.dart';
 // State untuk auth
 class AuthState {
   final bool isLoading;
+  final bool isInitialized;
   final UserModel? user;
   final String? token;
   final String? error;
 
   AuthState({
     this.isLoading = false,
+    this.isInitialized = false,
     this.user,
     this.token,
     this.error,
@@ -20,12 +23,14 @@ class AuthState {
 
   AuthState copyWith({
     bool? isLoading,
+    bool? isInitialized,
     UserModel? user,
     String? token,
     String? error,
   }) {
     return AuthState(
       isLoading: isLoading ?? this.isLoading,
+      isInitialized: isInitialized ?? this.isInitialized,
       user: user ?? this.user,
       token: token ?? this.token,
       error: error,
@@ -44,10 +49,22 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   // Cek token saat app pertama dibuka
   Future<void> _checkToken() async {
-    final token = await _storage.read(key: 'access_token');
-    final userJson = await _storage.read(key: 'user_data');
-    if (token != null && userJson != null) {
-      // Token ada, user sudah login sebelumnya
+    try {
+      final token = await _storage.read(key: 'access_token');
+      final userJson = await _storage.read(key: 'user_data');
+      if (token != null && userJson != null) {
+        final userMap = jsonDecode(userJson);
+        final user = UserModel.fromJson(userMap);
+        state = AuthState(
+          user: user,
+          token: token,
+          isInitialized: true,
+        );
+      } else {
+        state = state.copyWith(isInitialized: true);
+      }
+    } catch (e) {
+      state = state.copyWith(isInitialized: true);
     }
   }
 
@@ -65,6 +82,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       // Simpan token & data user
       await _storage.write(key: 'access_token', value: token);
+      await _storage.write(key: 'user_data', value: jsonEncode(user.toJson()));
 
       state = state.copyWith(isLoading: false, user: user, token: token);
       return true;
@@ -97,6 +115,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final user = UserModel.fromJson(response.data['user']);
 
       await _storage.write(key: 'access_token', value: token);
+      await _storage.write(key: 'user_data', value: jsonEncode(user.toJson()));
+      
       state = state.copyWith(isLoading: false, user: user, token: token);
       return true;
     } on DioException catch (e) {
@@ -112,16 +132,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
   // LOGOUT
   Future<void> logout() async {
     await _storage.deleteAll();
-    state = AuthState();
+    state = AuthState(isInitialized: true);
   }
 
   // UPDATE user data di state (setelah edit profil)
-  void refreshUser(Map<String, dynamic> userData) {
+  void refreshUser(Map<String, dynamic> userData) async {
     final user = UserModel.fromJson(userData);
     state = state.copyWith(user: user);
+    await _storage.write(key: 'user_data', value: jsonEncode(user.toJson()));
   }
 }
-
 
 // Provider
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../core/theme/app_theme.dart';
 import '../../features/auth/providers/auth_provider.dart';
 
@@ -329,35 +330,65 @@ class _NavItemWidget extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          padding: const EdgeInsets.fromLTRB(0, 10, 12, 10),
           decoration: BoxDecoration(
             color: isActive
                 ? AppTheme.sidebarActive.withOpacity(0.9)
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
-            border: isActive
-                ? Border(left: BorderSide(color: AppTheme.accent, width: 3))
-                : null,
           ),
           child: Row(
             children: [
-              Icon(
-                item.icon,
-                color: isActive ? Colors.white : AppTheme.sidebarHint,
-                size: 20,
+              // Active Indicator Line on the left edge of the button
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: 4,
+                height: 18,
+                decoration: BoxDecoration(
+                  color: isActive ? AppTheme.accent : Colors.transparent,
+                  borderRadius: const BorderRadius.only(
+                    topRight: Radius.circular(2),
+                    bottomRight: Radius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8), // 4 width + 8 spacing = 12px from left
+              
+              // Smoothly animated Icon Color
+              TweenAnimationBuilder<Color?>(
+                duration: const Duration(milliseconds: 200),
+                tween: ColorTween(
+                  begin: isActive ? AppTheme.sidebarHint : Colors.white,
+                  end: isActive ? Colors.white : AppTheme.sidebarHint,
+                ),
+                builder: (context, color, child) {
+                  return Icon(
+                    item.icon,
+                    color: color,
+                    size: 20,
+                  );
+                },
               ),
               const SizedBox(width: 12),
-              Text(
-                item.label,
-                style: TextStyle(
+              
+              // Smoothly animated Text Color and Weight
+              AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 200),
+                style: GoogleFonts.inter(
                   color: isActive ? Colors.white : AppTheme.sidebarHint,
                   fontSize: 14,
                   fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
                 ),
+                child: Text(item.label),
               ),
-              if (isActive) ...[
-                const Spacer(),
-                Container(
+              
+              const Spacer(),
+              
+              // Smoothly animated Active Dot Indicator
+              AnimatedOpacity(
+                duration: const Duration(milliseconds: 200),
+                opacity: isActive ? 1.0 : 0.0,
+                child: Container(
                   width: 6,
                   height: 6,
                   decoration: const BoxDecoration(
@@ -365,7 +396,7 @@ class _NavItemWidget extends StatelessWidget {
                     shape: BoxShape.circle,
                   ),
                 ),
-              ],
+              ),
             ],
           ),
         ),

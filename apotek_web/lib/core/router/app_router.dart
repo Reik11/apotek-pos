@@ -1,7 +1,9 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 // Web screens
+import '../../features/auth/screens/splash_screen.dart';
 import '../../features/auth/screens/login_screen.dart';
 import '../../features/auth/screens/register_screen.dart';
 import '../../features/dashboard/screens/dashboard_screen.dart';
@@ -26,8 +28,12 @@ import '../../shared/widgets/main_layout.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
-    initialLocation: '/login',
+    initialLocation: '/',
     routes: [
+      GoRoute(
+        path: '/',
+        builder: (context, state) => const SplashScreen(),
+      ),
       GoRoute(
         path: '/login',
         builder: (context, state) => const LoginScreen(),
@@ -48,43 +54,43 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         routes: [
           GoRoute(
             path: '/dashboard',
-            builder: (context, state) => const DashboardScreen(),
+            pageBuilder: (context, state) => _fadeTransitionPage(state, const DashboardScreen()),
           ),
           GoRoute(
             path: '/kasir',
-            builder: (context, state) => const KasirScreen(),
+            pageBuilder: (context, state) => _fadeTransitionPage(state, const KasirScreen()),
           ),
           GoRoute(
             path: '/inventory',
-            builder: (context, state) => const InventoryScreen(),
+            pageBuilder: (context, state) => _fadeTransitionPage(state, const InventoryScreen()),
           ),
           GoRoute(
             path: '/reports',
-            builder: (context, state) => const ReportsScreen(),
+            pageBuilder: (context, state) => _fadeTransitionPage(state, const ReportsScreen()),
           ),
           GoRoute(
             path: '/admin-reports',
-            builder: (context, state) => const UserReportsScreen(),
+            pageBuilder: (context, state) => _fadeTransitionPage(state, const UserReportsScreen()),
           ),
           GoRoute(
             path: '/users',
-            builder: (context, state) => const UsersScreen(),
+            pageBuilder: (context, state) => _fadeTransitionPage(state, const UsersScreen()),
           ),
           GoRoute(
             path: '/suppliers',
-            builder: (context, state) => const SuppliersScreen(),
+            pageBuilder: (context, state) => _fadeTransitionPage(state, const SuppliersScreen()),
           ),
           GoRoute(
             path: '/purchase-orders',
-            builder: (context, state) => const PurchaseOrdersScreen(),
+            pageBuilder: (context, state) => _fadeTransitionPage(state, const PurchaseOrdersScreen()),
           ),
           GoRoute(
             path: '/profile',
-            builder: (context, state) => const ProfileScreen(),
+            pageBuilder: (context, state) => _fadeTransitionPage(state, const ProfileScreen()),
           ),
           GoRoute(
             path: '/outlets',
-            builder: (context, state) => const OutletsScreen(),
+            pageBuilder: (context, state) => _fadeTransitionPage(state, const OutletsScreen()),
           ),
         ],
       ),
@@ -101,3 +107,18 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     ],
   );
 });
+
+CustomTransitionPage<void> _fadeTransitionPage(GoRouterState state, Widget child) {
+  return CustomTransitionPage<void>(
+    key: state.pageKey,
+    child: child,
+    transitionDuration: const Duration(milliseconds: 200),
+    reverseTransitionDuration: const Duration(milliseconds: 200),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      return FadeTransition(
+        opacity: CurveTween(curve: Curves.easeInOut).animate(animation),
+        child: child,
+      );
+    },
+  );
+}
