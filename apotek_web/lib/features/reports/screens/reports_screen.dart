@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/main_layout.dart';
 import '../providers/reports_provider.dart';
+import '../utils/report_pdf_helper.dart';
 
 class ReportsScreen extends ConsumerWidget {
   const ReportsScreen({super.key});
@@ -48,6 +49,32 @@ class ReportsScreen extends ConsumerWidget {
                     ],
                   ),
                 ),
+
+                // Tombol Ekspor PDF
+                ElevatedButton.icon(
+                  onPressed: salesAsync.valueOrNull == null
+                      ? null
+                      : () async {
+                          await ReportPdfHelper.generateAndPrint(
+                            context: context,
+                            salesData: salesAsync.value!,
+                            expiryData: expiryAsync.valueOrNull,
+                            inventoryData: inventoryAsync.valueOrNull,
+                            period: selectedPeriod,
+                          );
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  icon: const Icon(Icons.picture_as_pdf_rounded, size: 18),
+                  label: const Text('Ekspor PDF'),
+                ),
+                const SizedBox(width: 12),
 
                 // Filter periode
                 Container(
