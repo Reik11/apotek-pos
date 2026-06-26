@@ -1,6 +1,6 @@
 import {
   Controller, Get, Post, Put, Patch, Delete,
-  Body, Param, Query, UseGuards, Request,
+  Body, Param, Query, UseGuards, Request, ForbiddenException,
 } from '@nestjs/common';
 import { DrugsService } from './drugs.service';
 import { AuthGuard } from '@nestjs/passport';
@@ -57,17 +57,33 @@ export class DrugsController {
   }
 
   @Post()
-  create(@Body() body: any) {
-    return this.drugsService.create(body);
+  create(@Request() req: any, @Body() body: any) {
+    const outletId = req.user.role === 'SUPER_ADMIN' ? body.outletId : req.user.outletId;
+    return this.drugsService.create({
+      ...body,
+      outletId,
+    });
   }
 
- @Patch(':id')  // ← dari @Put menjadi @Patch
-  update(@Param('id') id: string, @Body() body: any) {
+  @Patch(':id')
+  async update(@Request() req: any, @Param('id') id: string, @Body() body: any) {
+    const drug = await this.drugsService.findOne(id);
+    if (req.user.role !== 'SUPER_ADMIN') {
+      if (!drug.outletId || drug.outletId !== req.user.outletId) {
+        throw new ForbiddenException('Anda tidak memiliki akses untuk mengubah obat ini');
+      }
+    }
     return this.drugsService.update(id, body);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
+  async remove(@Request() req: any, @Param('id') id: string) {
+    const drug = await this.drugsService.findOne(id);
+    if (req.user.role !== 'SUPER_ADMIN') {
+      if (!drug.outletId || drug.outletId !== req.user.outletId) {
+        throw new ForbiddenException('Anda tidak memiliki akses untuk menghapus obat ini');
+      }
+    }
     return this.drugsService.remove(id);
   }
 

@@ -5,22 +5,31 @@ import { PrismaService } from '../prisma/prisma.service';
 export class DrugsService {
   constructor(private prisma: PrismaService) {}
 
-  // AMBIL SEMUA OBAT
   async findAll(search?: string, category?: string, outletId?: string) {
+    const whereClause: any = {
+      isActive: true,
+      AND: [
+        search ? {
+          OR: [
+            { name: { contains: search, mode: 'insensitive' } },
+            { genericName: { contains: search, mode: 'insensitive' } },
+            { activeIngredient: { contains: search, mode: 'insensitive' } },
+          ],
+        } : {},
+        category ? { category: category as any } : {},
+      ],
+    };
+
+    // Scoping multi-outlet hybrid
+    if (outletId) {
+      whereClause.OR = [
+        { outletId: null }, // Katalog Global
+        { outletId: outletId }, // Obat Kustom Cabang
+      ];
+    }
+
     return this.prisma.drug.findMany({
-      where: {
-        isActive: true,
-        AND: [
-          search ? {
-            OR: [
-              { name: { contains: search, mode: 'insensitive' } },
-              { genericName: { contains: search, mode: 'insensitive' } },
-              { activeIngredient: { contains: search, mode: 'insensitive' } },
-            ],
-          } : {},
-          category ? { category: category as any } : {},
-        ],
-      },
+      where: whereClause,
       include: {
         batches: {
           where: {
@@ -81,6 +90,7 @@ export class DrugsService {
     rxcui?: string;
     bpomNumber?: string;
     description?: string;
+    outletId?: string;
   }) {
     return this.prisma.drug.create({ data });
   }

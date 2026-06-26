@@ -10,6 +10,7 @@ class DrugModel {
   final double sellPrice;
   final double buyPrice;
   final String? description;
+  final String? outletId;
   final List<BatchModel> batches;
 
   DrugModel({
@@ -24,6 +25,7 @@ class DrugModel {
     required this.sellPrice,
     required this.buyPrice,
     this.description,
+    this.outletId,
     this.batches = const [],
   });
 
@@ -40,6 +42,7 @@ class DrugModel {
       sellPrice: (json['sellPrice'] as num).toDouble(),
       buyPrice: (json['buyPrice'] as num).toDouble(),
       description: json['description'],
+      outletId: json['outletId'],
       batches: (json['batches'] as List<dynamic>? ?? [])
           .map((b) => BatchModel.fromJson(b))
           .toList(),

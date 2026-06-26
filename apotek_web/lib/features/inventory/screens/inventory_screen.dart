@@ -7,6 +7,8 @@ import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/main_layout.dart';
 import '../providers/inventory_provider.dart';
 import '../../../shared/models/drug_model.dart';
+import '../../auth/providers/auth_provider.dart';
+import '../../outlets/providers/outlets_provider.dart';
 
 class InventoryScreen extends ConsumerStatefulWidget {
   const InventoryScreen({super.key});
@@ -169,6 +171,9 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
 
   // Tabel daftar obat
   Widget _buildDrugTable(List<DrugModel> drugs) {
+    final authState = ref.watch(authProvider);
+    final isSuperAdmin = authState.user?.role == 'SUPER_ADMIN';
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -262,7 +267,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
                                   fontSize: 13,
                                 ),
                               ),
-                              if (drug.genericName != null)
+                              if (drug.genericName != null && drug.genericName!.isNotEmpty)
                                 Text(
                                   drug.genericName!,
                                   style: const TextStyle(
@@ -270,6 +275,32 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
                                     color: AppTheme.textSecondary,
                                   ),
                                 ),
+                              const SizedBox(height: 4),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: drug.outletId == null
+                                      ? Colors.green.shade50
+                                      : Colors.blueGrey.shade50,
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(
+                                    color: drug.outletId == null
+                                        ? Colors.green.shade200
+                                        : Colors.blueGrey.shade200,
+                                    width: 0.5,
+                                  ),
+                                ),
+                                child: Text(
+                                  drug.outletId == null ? 'Katalog Global' : 'Kustom Cabang',
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                    color: drug.outletId == null
+                                        ? Colors.green.shade800
+                                        : Colors.blueGrey.shade800,
+                                  ),
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -368,10 +399,19 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
                                     _showDrugInfoDialog(context, drug),
                               ),
                               IconButton(
-                                icon: const Icon(Icons.delete_outline_rounded,
-                                    color: AppTheme.danger, size: 20),
-                                tooltip: 'Hapus Obat',
-                                onPressed: () => _confirmDeleteDrug(context, drug),
+                                icon: Icon(
+                                  Icons.delete_outline_rounded,
+                                  color: (drug.outletId == null && !isSuperAdmin)
+                                      ? Colors.grey.shade400
+                                      : AppTheme.danger,
+                                  size: 20,
+                                ),
+                                tooltip: (drug.outletId == null && !isSuperAdmin)
+                                    ? 'Katalog global tidak dapat dihapus oleh cabang'
+                                    : 'Hapus Obat',
+                                onPressed: (drug.outletId == null && !isSuperAdmin)
+                                    ? null
+                                    : () => _confirmDeleteDrug(context, drug),
                               ),
                             ],
                           ),
@@ -430,6 +470,11 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
     String selectedType = 'GENERIK';
     bool isSearchingApi = false;
     List<DrugModel> localSuggestions = [];
+
+    final outletsState = ref.read(outletsProvider);
+    final authState = ref.read(authProvider);
+    final isSuperAdmin = authState.user?.role == 'SUPER_ADMIN';
+    String? selectedOutletId;
 
     showDialog(
       context: context,
@@ -701,6 +746,29 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
                       ),
                     ],
                   ),
+                  if (isSuperAdmin) ...[
+                    const SizedBox(height: 16),
+                    const Text('Outlet Penempatan',
+                        style: TextStyle(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<String?>(
+                      value: selectedOutletId,
+                      decoration: const InputDecoration(
+                        hintText: 'Pilih Cabang (Global by default)',
+                      ),
+                      items: [
+                        const DropdownMenuItem<String?>(
+                          value: null,
+                          child: Text('Global (Semua Cabang)'),
+                        ),
+                        ...outletsState.outlets.map((outlet) => DropdownMenuItem<String?>(
+                              value: outlet['id'] as String?,
+                              child: Text(outlet['name'] ?? ''),
+                            )),
+                      ],
+                      onChanged: (v) => setDialogState(() => selectedOutletId = v),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -723,6 +791,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
                   'buyPrice': double.tryParse(buyPriceController.text) ?? 0,
                   'minStock': int.tryParse(minStockController.text) ?? 10,
                   'unit': 'tablet',
+                  if (isSuperAdmin) 'outletId': selectedOutletId,
                 });
                 if (success && context.mounted) {
                   Navigator.pop(context);
@@ -749,6 +818,11 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
     final buyPriceController =
         TextEditingController(text: drug.buyPrice.toInt().toString());
     DateTime selectedDate = DateTime.now().add(const Duration(days: 365));
+
+    final outletsState = ref.read(outletsProvider);
+    final authState = ref.read(authProvider);
+    final isSuperAdmin = authState.user?.role == 'SUPER_ADMIN';
+    String? selectedOutletId = drug.outletId ?? (outletsState.outlets.isNotEmpty ? outletsState.outlets.first['id'] as String? : null);
 
     showDialog(
       context: context,
@@ -837,6 +911,23 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
                     ),
                   ),
                 ),
+                if (isSuperAdmin && drug.outletId == null) ...[
+                  const SizedBox(height: 16),
+                  const Text('Outlet Tujuan',
+                      style: TextStyle(fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String?>(
+                    value: selectedOutletId,
+                    decoration: const InputDecoration(
+                      hintText: 'Pilih Outlet',
+                    ),
+                    items: outletsState.outlets.map((outlet) => DropdownMenuItem<String?>(
+                          value: outlet['id'] as String?,
+                          child: Text(outlet['name'] ?? ''),
+                        )).toList(),
+                    onChanged: (v) => setDialogState(() => selectedOutletId = v),
+                  ),
+                ],
               ],
             ),
           ),
@@ -854,6 +945,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
                   'stock': int.tryParse(stockController.text) ?? 0,
                   'buyPrice': double.tryParse(buyPriceController.text) ?? 0,
                   'expiredDate': selectedDate.toIso8601String().split('T')[0],
+                  if (isSuperAdmin) 'outletId': selectedOutletId,
                 });
                 if (success && context.mounted) {
                   Navigator.pop(context);

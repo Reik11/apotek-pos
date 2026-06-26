@@ -78,6 +78,9 @@ model Drug {
   batches          DrugBatch[]
   transactionItems TransactionItem[]
   orderItems       OrderItem[]
+
+  outletId         String?
+  outlet           Outlet?      @relation(fields: [outletId], references: [id])
 }
 
 enum DrugCategory {
@@ -417,4 +420,5 @@ model Outlet {
   transactions Transaction[]
   orders       Order[]
   shifts       CashShift[]
+  drugs        Drug[]
 }
