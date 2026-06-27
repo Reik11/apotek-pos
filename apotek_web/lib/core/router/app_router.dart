@@ -29,8 +29,41 @@ import '../../features/mobile/pasien/screens/pasien_home_screen.dart';
 import '../../shared/widgets/main_layout.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
+  final authState = ref.watch(authProvider);
+
   return GoRouter(
     initialLocation: '/',
+    redirect: (context, state) {
+      if (!authState.isInitialized) {
+        return null;
+      }
+
+      final loggedIn = authState.user != null;
+      final isAuthRoute = state.matchedLocation == '/login' ||
+          state.matchedLocation == '/register' ||
+          state.matchedLocation == '/forgot-password' ||
+          state.matchedLocation == '/';
+
+      if (!loggedIn) {
+        if (!isAuthRoute) {
+          return '/login';
+        }
+      } else {
+        if (state.matchedLocation == '/login' ||
+            state.matchedLocation == '/register' ||
+            state.matchedLocation == '/') {
+          final role = authState.user!.role;
+          if (role == 'PASIEN') {
+            return '/pasien';
+          } else if (role == 'APOTEKER') {
+            return '/apoteker';
+          } else {
+            return '/dashboard';
+          }
+        }
+      }
+      return null;
+    },
     routes: [
       GoRoute(
         path: '/',
