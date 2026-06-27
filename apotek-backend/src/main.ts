@@ -7,9 +7,12 @@ async function bootstrap() {
   app.enableCors({
   origin: [
     'https://apotekmedika.netlify.app',
+    'https://medikaid.netlify.app',
     'https://fascinating-capybara-a9a758.netlify.app',
     'http://localhost:8080',
     'http://localhost:3000',
+    'http://localhost:7357',
+    'http://localhost',
   ],
   methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
   credentials: true,
