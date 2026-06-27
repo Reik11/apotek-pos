@@ -267,7 +267,7 @@ class _ShiftsHistoryScreenState extends ConsumerState<ShiftsHistoryScreen> {
                                           final difference = s['difference'] != null ? (s['difference'] as num).toDouble() : null;
 
                                           return TableRow(
-                                            decoration: Border(bottom: BorderSide(color: Colors.grey.shade100)),
+                                            decoration: BoxDecoration(border: Border(bottom: BorderSide(color: Colors.grey.shade100))),
                                             children: [
                                               _buildCell(Text(id, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.primary))),
                                               _buildCell(Row(
