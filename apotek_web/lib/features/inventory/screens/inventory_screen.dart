@@ -9,6 +9,7 @@ import '../providers/inventory_provider.dart';
 import '../../../shared/models/drug_model.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../outlets/providers/outlets_provider.dart';
+import '../../suppliers/providers/suppliers_provider.dart';
 
 class InventoryScreen extends ConsumerStatefulWidget {
   const InventoryScreen({super.key});
@@ -31,6 +32,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
     _tabController = TabController(length: 2, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(inventoryProvider.notifier).checkSyncStatus();
+      ref.read(suppliersProvider.notifier).loadSuppliers();
       _syncTimer = Timer.periodic(const Duration(seconds: 5), (_) {
         if (mounted) {
           ref.read(inventoryProvider.notifier).checkSyncStatus();
@@ -821,8 +823,10 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
 
     final outletsState = ref.read(outletsProvider);
     final authState = ref.read(authProvider);
+    final suppliersState = ref.read(suppliersProvider);
     final isSuperAdmin = authState.user?.role == 'SUPER_ADMIN';
     String? selectedOutletId = drug.outletId ?? (outletsState.outlets.isNotEmpty ? outletsState.outlets.first['id'] as String? : null);
+    String? selectedSupplierId;
 
     showDialog(
       context: context,
@@ -911,6 +915,27 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
                     ),
                   ),
                 ),
+                const SizedBox(height: 16),
+                const Text('Supplier / Pemasok',
+                    style: TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String?>(
+                  value: selectedSupplierId,
+                  decoration: const InputDecoration(
+                    hintText: 'Pilih Supplier (Opsional)',
+                  ),
+                  items: [
+                    const DropdownMenuItem<String?>(
+                      value: null,
+                      child: Text('Tanpa Supplier / Pemasok'),
+                    ),
+                    ...suppliersState.suppliers.map((s) => DropdownMenuItem<String?>(
+                          value: s['id'] as String?,
+                          child: Text(s['name'] ?? ''),
+                        )),
+                  ],
+                  onChanged: (v) => setDialogState(() => selectedSupplierId = v),
+                ),
                 if (isSuperAdmin && drug.outletId == null) ...[
                   const SizedBox(height: 16),
                   const Text('Outlet Tujuan',
@@ -946,6 +971,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
                   'buyPrice': double.tryParse(buyPriceController.text) ?? 0,
                   'expiredDate': selectedDate.toIso8601String().split('T')[0],
                   if (isSuperAdmin) 'outletId': selectedOutletId,
+                  if (selectedSupplierId != null) 'supplierId': selectedSupplierId,
                 });
                 if (success && context.mounted) {
                   Navigator.pop(context);
