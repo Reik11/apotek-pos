@@ -21,6 +21,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   bool _obscureConfirm = true;
   bool _agreeTerms = false;
   bool _otpSent = false;
+  bool _isSendingOtp = false;
   String _passwordValue = '';
 
   @override
@@ -102,18 +103,25 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   Future<void> _handleRequestOtp() async {
     if (!_validateForm()) return;
 
-    final success = await ref
-        .read(authProvider.notifier)
-        .requestRegisterOtp(_emailController.text.trim());
+    setState(() => _isSendingOtp = true);
+    try {
+      final success = await ref
+          .read(authProvider.notifier)
+          .requestRegisterOtp(_emailController.text.trim());
 
-    if (success && mounted) {
-      setState(() => _otpSent = true);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Kode OTP telah dikirim! Periksa email Anda.'),
-          backgroundColor: AppTheme.success,
-        ),
-      );
+      if (success && mounted) {
+        setState(() => _otpSent = true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Kode OTP telah dikirim! Periksa email Anda.'),
+            backgroundColor: AppTheme.success,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSendingOtp = false);
+      }
     }
   }
 
@@ -414,9 +422,20 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     backgroundColor: _otpSent ? AppTheme.success : null,
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                   ),
-                  onPressed: authState.isLoading ? null : _handleRequestOtp,
-                  icon: Icon(_otpSent ? Icons.check_circle_outline : Icons.send_rounded, size: 16),
-                  label: Text(_otpSent ? 'Terkirim' : 'Kirim OTP'),
+                  onPressed: (authState.isLoading || _isSendingOtp) ? null : _handleRequestOtp,
+                  icon: _isSendingOtp
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Icon(_otpSent ? Icons.check_circle_outline : Icons.send_rounded, size: 16),
+                  label: Text(_isSendingOtp
+                      ? 'Mengirim...'
+                      : (_otpSent ? 'Kirim Ulang' : 'Kirim OTP')),
                 ),
               ),
             ],

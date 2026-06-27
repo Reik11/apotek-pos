@@ -115,17 +115,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   // REQUEST OTP PENDAFTARAN
   Future<bool> requestRegisterOtp(String email) async {
-    state = state.copyWith(isLoading: true, error: null);
+    state = state.copyWith(error: null);
     try {
       await _dio.post('/auth/register/request-otp', data: {'email': email});
-      state = state.copyWith(isLoading: false);
       return true;
     } on DioException catch (e) {
       final message = _parseError(e, 'Gagal mengirim OTP. Email mungkin sudah terdaftar.');
-      state = state.copyWith(isLoading: false, error: message);
+      state = state.copyWith(error: message);
       return false;
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: 'Terjadi kesalahan: $e');
+      state = state.copyWith(error: 'Terjadi kesalahan: $e');
       return false;
     }
   }
@@ -167,21 +166,20 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   // REQUEST OTP GANTI PASSWORD
   Future<bool> requestChangePasswordOtp() async {
-    state = state.copyWith(isLoading: true, error: null);
+    state = state.copyWith(error: null);
     try {
       final token = state.token;
       await _dio.post(
         '/auth/change-password/request-otp',
         options: Options(headers: token != null ? {'Authorization': 'Bearer $token'} : {}),
       );
-      state = state.copyWith(isLoading: false);
       return true;
     } on DioException catch (e) {
       final message = _parseError(e, 'Gagal mengirim OTP. Coba lagi.');
-      state = state.copyWith(isLoading: false, error: message);
+      state = state.copyWith(error: message);
       return false;
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: 'Terjadi kesalahan: $e');
+      state = state.copyWith(error: 'Terjadi kesalahan: $e');
       return false;
     }
   }
