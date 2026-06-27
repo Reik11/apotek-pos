@@ -169,6 +169,11 @@ class MainLayout extends ConsumerWidget {
           route: '/users',
           roles: ['SUPER_ADMIN', 'ADMIN']),
       _NavItem(
+          icon: Icons.history_rounded,
+          label: 'Riwayat Shift',
+          route: '/shifts',
+          roles: ['SUPER_ADMIN', 'ADMIN']),
+      _NavItem(
           icon: Icons.storefront_rounded,
           label: 'Outlet',
           route: '/outlets',

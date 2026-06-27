@@ -8,6 +8,7 @@ import '../../features/auth/screens/login_screen.dart';
 import '../../features/auth/screens/register_screen.dart';
 import '../../features/dashboard/screens/dashboard_screen.dart';
 import '../../features/kasir/screens/kasir_screen.dart';
+import '../../features/kasir/screens/shifts_history_screen.dart';
 import '../../features/inventory/screens/inventory_screen.dart';
 import '../../features/reports/screens/reports_screen.dart';
 import '../../features/reports/screens/user_reports_screen.dart';
@@ -75,6 +76,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/users',
             pageBuilder: (context, state) => _fadeTransitionPage(state, const UsersScreen()),
+          ),
+          GoRoute(
+            path: '/shifts',
+            pageBuilder: (context, state) => _fadeTransitionPage(state, const ShiftsHistoryScreen()),
           ),
           GoRoute(
             path: '/suppliers',
