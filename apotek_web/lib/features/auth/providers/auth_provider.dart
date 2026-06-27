@@ -50,8 +50,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
   // Cek token saat app pertama dibuka
   Future<void> _checkToken() async {
     try {
-      final token = await _storage.read(key: 'access_token');
-      final userJson = await _storage.read(key: 'user_data');
+      // Menambahkan timeout agar jika flutter_secure_storage stuck di web (karena isu WebCrypto),
+      // aplikasi akan otomatis mengabaikannya dan lanjut ke login screen (tidak stuck di splash).
+      final token = await _storage.read(key: 'access_token').timeout(const Duration(seconds: 1));
+      final userJson = await _storage.read(key: 'user_data').timeout(const Duration(seconds: 1));
       if (token != null && userJson != null) {
         final userMap = jsonDecode(userJson);
         final user = UserModel.fromJson(userMap);
