@@ -24,6 +24,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   String _passwordValue = '';
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(authProvider.notifier).clearError();
+    });
+  }
+
+  @override
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();

@@ -23,6 +23,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   );
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(authProvider.notifier).clearError();
+    });
+  }
+
+  @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();

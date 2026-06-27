@@ -68,6 +68,21 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  String _parseError(DioException e, String defaultMsg) {
+    final dynamic rawMessage = e.response?.data['message'];
+    if (rawMessage is List) {
+      return rawMessage.join(', ');
+    } else if (rawMessage is String) {
+      return rawMessage;
+    }
+    return defaultMsg;
+  }
+
+  // Clear auth error message
+  void clearError() {
+    state = state.copyWith(error: null);
+  }
+
   // LOGIN
   Future<bool> login(String email, String password) async {
     state = state.copyWith(isLoading: true, error: null);
@@ -87,7 +102,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = state.copyWith(isLoading: false, user: user, token: token);
       return true;
     } on DioException catch (e) {
-      final message = e.response?.data['message'] ?? 'Koneksi ke server gagal atau salah password.';
+      final message = _parseError(e, 'Koneksi ke server gagal atau salah password.');
       state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {
@@ -104,7 +119,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = state.copyWith(isLoading: false);
       return true;
     } on DioException catch (e) {
-      final message = e.response?.data['message'] ?? 'Gagal mengirim OTP. Email mungkin sudah terdaftar.';
+      final message = _parseError(e, 'Gagal mengirim OTP. Email mungkin sudah terdaftar.');
       state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {
@@ -139,7 +154,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = state.copyWith(isLoading: false, user: user, token: token);
       return true;
     } on DioException catch (e) {
-      final message = e.response?.data['message'] ?? 'Pendaftaran gagal. Cek kembali kode OTP Anda.';
+      final message = _parseError(e, 'Pendaftaran gagal. Cek kembali kode OTP Anda.');
       state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {
@@ -160,7 +175,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = state.copyWith(isLoading: false);
       return true;
     } on DioException catch (e) {
-      final message = e.response?.data['message'] ?? 'Gagal mengirim OTP. Coba lagi.';
+      final message = _parseError(e, 'Gagal mengirim OTP. Coba lagi.');
       state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {
@@ -183,7 +198,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = state.copyWith(isLoading: false);
       return true;
     } on DioException catch (e) {
-      final message = e.response?.data['message'] ?? 'Gagal meminta kode OTP. Cek kembali email Anda.';
+      final message = _parseError(e, 'Gagal meminta kode OTP. Cek kembali email Anda.');
       state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {
@@ -204,7 +219,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = state.copyWith(isLoading: false);
       return true;
     } on DioException catch (e) {
-      final message = e.response?.data['message'] ?? 'Gagal mereset kata sandi. Cek kembali kode OTP.';
+      final message = _parseError(e, 'Gagal mereset kata sandi. Cek kembali kode OTP.');
       state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {
@@ -230,7 +245,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = state.copyWith(isLoading: false, user: user, token: token);
       return true;
     } on DioException catch (e) {
-      final message = e.response?.data['message'] ?? 'Gagal masuk menggunakan Google.';
+      final message = _parseError(e, 'Gagal masuk menggunakan Google.');
       state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {
