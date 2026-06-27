@@ -30,11 +30,11 @@ import '../../features/mobile/pasien/screens/pasien_home_screen.dart';
 import '../../shared/widgets/main_layout.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
-  final authState = ref.watch(authProvider);
-
-  return GoRouter(
+  final router = GoRouter(
     initialLocation: '/',
     redirect: (context, state) {
+      final authState = ref.read(authProvider);
+
       if (!authState.isInitialized) {
         return null;
       }
@@ -168,6 +168,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
     ],
   );
+
+  // Dengarkan authProvider untuk memicu refresh router secara reaktif tanpa re-create instance router
+  ref.listen<AuthState>(authProvider, (previous, next) {
+    if (previous?.user != next.user || previous?.isInitialized != next.isInitialized) {
+      router.refresh();
+    }
+  });
+
+  return router;
 });
 
 CustomTransitionPage<void> _fadeTransitionPage(GoRouterState state, Widget child) {
