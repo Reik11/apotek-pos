@@ -243,7 +243,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> with SingleTicker
                       ],
                     ),
                     SizedBox(
-                      height: 400,
+                      height: 560,
                       child: TabBarView(
                         controller: _tabController,
                         children: [
@@ -263,7 +263,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> with SingleTicker
   }
 
   Widget _buildEditProfile() {
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -290,7 +290,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> with SingleTicker
             const SizedBox(height: 12),
             _statusBanner(_profileMsg!, _profileOk),
           ],
-          const Spacer(),
+          const SizedBox(height: 24),
           SizedBox(
             width: double.infinity,
             height: 48,
@@ -308,7 +308,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> with SingleTicker
   }
 
   Widget _buildChangePassword() {
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -417,7 +417,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> with SingleTicker
             const SizedBox(height: 10),
             _statusBanner(_passMsg!, _passOk),
           ],
-          const Spacer(),
+          const SizedBox(height: 24),
           SizedBox(
             width: double.infinity,
             height: 48,
