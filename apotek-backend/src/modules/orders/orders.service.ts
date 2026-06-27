@@ -210,34 +210,48 @@ export class OrdersService {
       );
     }
 
-    // Update status jadi COMPLETED
-    const completed = await this.prisma.order.update({
-      where: { orderCode },
-      data: { status: 'COMPLETED' },
-      include: {
-        items: { include: { drug: true } },
-        patient: { select: { id: true, name: true } },
-      },
-    });
-
-    // Kurangi stok obat
-    for (const item of order.items) {
-      const batch = await this.prisma.drugBatch.findFirst({
-        where: {
-          drugId: item.drugId,
-          stock: { gte: item.quantity },
-          outletId: order.outletId || undefined,
+    return this.prisma.$transaction(async (tx) => {
+      // Update status jadi COMPLETED
+      const completed = await tx.order.update({
+        where: { orderCode },
+        data: { status: 'COMPLETED' },
+        include: {
+          items: { include: { drug: true } },
+          patient: { select: { id: true, name: true } },
         },
-        orderBy: { expiredDate: 'asc' },
       });
-      if (batch) {
-        await this.prisma.drugBatch.update({
-          where: { id: batch.id },
-          data: { stock: { decrement: item.quantity } },
-        });
-      }
-    }
 
-    return completed;
+      // Kurangi stok obat (FEFO dinamis)
+      for (const item of order.items) {
+        const batches = await tx.drugBatch.findMany({
+          where: {
+            drugId: item.drugId,
+            stock: { gt: 0 },
+            outletId: order.outletId || null,
+          },
+          orderBy: { expiredDate: 'asc' },
+        });
+
+        const totalAvailable = batches.reduce((sum, b) => sum + b.stock, 0);
+        if (totalAvailable < item.quantity) {
+          throw new BadRequestException(
+            `Stok obat ${item.drug.name} tidak mencukupi di cabang ini untuk memproses pesanan (Tersedia: ${totalAvailable}, Dibutuhkan: ${item.quantity})`
+          );
+        }
+
+        let remaining = item.quantity;
+        for (const batch of batches) {
+          if (remaining <= 0) break;
+          const take = Math.min(batch.stock, remaining);
+          await tx.drugBatch.update({
+            where: { id: batch.id },
+            data: { stock: { decrement: take } },
+          });
+          remaining -= take;
+        }
+      }
+
+      return completed;
+    });
   }
 }

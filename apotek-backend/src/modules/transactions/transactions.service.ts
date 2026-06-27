@@ -15,118 +15,131 @@ export class TransactionsService {
     discountValue?: number;
     notes?: string;
   }) {
-    // Ambil profile cashier & outletId
-    const cashier = await this.prisma.user.findUnique({
-      where: { id: data.cashierId },
-      select: { outletId: true },
-    });
-
-    // 0. Cek shift aktif kasir
-    const activeShift = await this.prisma.cashShift.findFirst({
-      where: { cashierId: data.cashierId, status: 'OPEN' },
-    });
-    if (!activeShift) {
-      throw new BadRequestException(
-        'Laci kasir belum dibuka. Anda harus membuka shift kasir terlebih dahulu.',
-      );
-    }
-
-    // Hitung total & validasi stok
-    let subtotal = 0;
-    const itemsWithBatch: {
-        drugId: string;
-        batchId: string;
-        quantity: number;
-        sellPrice: number;
-        subtotal: number;
-    }[] = [];
-
-    for (const item of data.items) {
-      // Ambil obat
-      const drug = await this.prisma.drug.findUnique({
-        where: { id: item.drugId },
+    return this.prisma.$transaction(async (tx) => {
+      // Ambil profile cashier & outletId
+      const cashier = await tx.user.findUnique({
+        where: { id: data.cashierId },
+        select: { outletId: true },
       });
-      if (!drug) throw new NotFoundException(`Obat ${item.drugId} tidak ditemukan`);
 
-      // Ambil batch dengan stok tersedia di outlet cashier (FIFO - expired terdekat dulu)
-      const batch = await this.prisma.drugBatch.findFirst({
-        where: {
-          drugId: item.drugId,
-          stock: { gte: item.quantity },
-          outletId: cashier?.outletId || null,
-        },
-        orderBy: { expiredDate: 'asc' },
+      // 0. Cek shift aktif kasir
+      const activeShift = await tx.cashShift.findFirst({
+        where: { cashierId: data.cashierId, status: 'OPEN' },
       });
-      if (!batch) {
-        throw new BadRequestException(`Stok ${drug.name} tidak cukup di cabang ini`);
+      if (!activeShift) {
+        throw new BadRequestException(
+          'Laci kasir belum dibuka. Anda harus membuka shift kasir terlebih dahulu.',
+        );
       }
 
-      const itemSubtotal = drug.sellPrice * item.quantity;
-      subtotal += itemSubtotal;
+      // Hitung total & validasi stok
+      let subtotal = 0;
+      const itemsWithBatch: {
+          drugId: string;
+          batchId: string;
+          quantity: number;
+          sellPrice: number;
+          subtotal: number;
+      }[] = [];
 
-      itemsWithBatch.push({
-        drugId: item.drugId,
-        batchId: batch.id,
-        quantity: item.quantity,
-        sellPrice: drug.sellPrice,
-        subtotal: itemSubtotal,
-      });
-    }
+      for (const item of data.items) {
+        // Ambil obat
+        const drug = await tx.drug.findUnique({
+          where: { id: item.drugId },
+        });
+        if (!drug) throw new NotFoundException(`Obat ${item.drugId} tidak ditemukan`);
 
-    // Hitung Diskon
-    const discountType = data.discountType || 'NOMINAL';
-    const discountValue = data.discountValue || 0;
-    let discountAmount = 0;
+        // Ambil semua batch dengan stok tersedia di outlet cashier (FEFO - expired terdekat dulu)
+        const batches = await tx.drugBatch.findMany({
+          where: {
+            drugId: item.drugId,
+            stock: { gt: 0 },
+            outletId: cashier?.outletId || null,
+          },
+          orderBy: { expiredDate: 'asc' },
+        });
 
-    if (discountType === 'PERCENT') {
-      discountAmount = subtotal * (discountValue / 100);
-    } else {
-      discountAmount = discountValue;
-    }
+        const totalAvailable = batches.reduce((sum, b) => sum + b.stock, 0);
+        if (totalAvailable < item.quantity) {
+          throw new BadRequestException(`Stok obat ${drug.name} tidak cukup di cabang ini (Tersedia: ${totalAvailable}, Dibutuhkan: ${item.quantity})`);
+        }
 
-    const totalAmount = Math.max(0, subtotal - discountAmount);
+        let remaining = item.quantity;
+        for (const batch of batches) {
+          if (remaining <= 0) break;
+          const take = Math.min(batch.stock, remaining);
+          const itemSubtotal = drug.sellPrice * take;
+          
+          itemsWithBatch.push({
+            drugId: item.drugId,
+            batchId: batch.id,
+            quantity: take,
+            sellPrice: drug.sellPrice,
+            subtotal: itemSubtotal,
+          });
 
-    // Validasi uang bayar
-    if (data.amountPaid < totalAmount) {
-      throw new BadRequestException('Uang bayar kurang');
-    }
+          remaining -= take;
+        }
+      }
 
-    const change = data.amountPaid - totalAmount;
+      // Hitung subtotal akumulatif setelah FEFO dipetakan
+      subtotal = itemsWithBatch.reduce((sum, item) => sum + item.subtotal, 0);
 
-    // Simpan transaksi ke database
-    const transaction = await this.prisma.transaction.create({
-      data: {
-        cashierId: data.cashierId,
-        shiftId: activeShift.id,
-        subtotal,
-        discountType,
-        discountValue,
-        discountAmount,
-        totalAmount,
-        paymentMethod: data.paymentMethod,
-        amountPaid: data.amountPaid,
-        change,
-        notes: data.notes,
-        outletId: cashier?.outletId || null,
-        items: {
-          create: itemsWithBatch,
+      // Hitung Diskon
+      const discountType = data.discountType || 'NOMINAL';
+      const discountValue = data.discountValue || 0;
+      let discountAmount = 0;
+
+      if (discountType === 'PERCENT') {
+        discountAmount = subtotal * (discountValue / 100);
+      } else {
+        discountAmount = discountValue;
+      }
+
+      const totalAmount = Math.max(0, subtotal - discountAmount);
+
+      // Validasi uang bayar
+      if (data.amountPaid < totalAmount) {
+        throw new BadRequestException('Uang bayar kurang');
+      }
+
+      const change = data.amountPaid - totalAmount;
+
+      // Simpan transaksi ke database
+      const transaction = await tx.transaction.create({
+        data: {
+          cashierId: data.cashierId,
+          shiftId: activeShift.id,
+          subtotal,
+          discountType,
+          discountValue,
+          discountAmount,
+          totalAmount,
+          paymentMethod: data.paymentMethod,
+          amountPaid: data.amountPaid,
+          change,
+          notes: data.notes,
+          outletId: cashier?.outletId || null,
+          items: {
+            create: itemsWithBatch,
+          },
         },
-      },
-      include: {
-        items: { include: { drug: true } },
-        outlet: true,
-      },
-    });
-
-    // Kurangi stok setiap batch
-    for (const item of itemsWithBatch) {
-      await this.prisma.drugBatch.update({
-        where: { id: item.batchId },
-        data: { stock: { decrement: item.quantity } },
+        include: {
+          items: { include: { drug: true } },
+          outlet: true,
+        },
       });
-    }
 
-    return transaction;
+      // Kurangi stok setiap batch
+      for (const item of itemsWithBatch) {
+        await tx.drugBatch.update({
+          where: { id: item.batchId },
+          data: { stock: { decrement: item.quantity } },
+        });
+      }
+
+      return transaction;
+    });
   }
 
   // AMBIL SEMUA TRANSAKSI
