@@ -32,11 +32,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Future<void> _handleGoogleLogin() async {
     try {
+      // Di web, signIn() kadang tidak mengembalikan idToken langsung.
+      // Kita signOut dulu untuk memastikan fresh login, lalu signIn.
+      await _googleSignIn.signOut();
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
       if (googleUser == null) return;
 
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-      final String? idToken = googleAuth.idToken;
+      GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      String? idToken = googleAuth.idToken;
+
+      // Jika idToken null, coba signInSilently untuk refresh credential
+      if (idToken == null) {
+        final silentUser = await _googleSignIn.signInSilently();
+        if (silentUser != null) {
+          googleAuth = await silentUser.authentication;
+          idToken = googleAuth.idToken;
+        }
+      }
 
       if (idToken == null) {
         throw Exception('Gagal mendapatkan ID Token dari Google.');
