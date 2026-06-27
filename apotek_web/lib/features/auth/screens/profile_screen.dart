@@ -25,6 +25,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> with SingleTicker
   bool _obscureConfirm = true;
   bool _savingProfile = false;
   bool _savingPass = false;
+  bool _requestingOtp = false;
+  bool _otpPassSent = false;
+  final _otpPassCtrl = TextEditingController();
   String? _profileMsg;
   String? _passMsg;
   bool _profileOk = false;
@@ -47,6 +50,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> with SingleTicker
     _currentPassCtrl.dispose();
     _newPassCtrl.dispose();
     _confirmPassCtrl.dispose();
+    _otpPassCtrl.dispose();
     super.dispose();
   }
 
@@ -69,6 +73,26 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> with SingleTicker
     }
   }
 
+  Future<void> _requestChangePasswordOtp() async {
+    setState(() => _requestingOtp = true);
+    try {
+      final success = await ref.read(authProvider.notifier).requestChangePasswordOtp();
+      if (success && mounted) {
+        setState(() { _otpPassSent = true; _requestingOtp = false; });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Kode OTP dikirim ke email Anda! Berlaku 5 menit.'),
+            backgroundColor: AppTheme.success,
+          ),
+        );
+      } else {
+        setState(() => _requestingOtp = false);
+      }
+    } catch (_) {
+      setState(() => _requestingOtp = false);
+    }
+  }
+
   Future<void> _changePassword() async {
     if (_newPassCtrl.text != _confirmPassCtrl.text) {
       setState(() { _passOk = false; _passMsg = 'Konfirmasi password tidak cocok'; });
@@ -78,12 +102,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> with SingleTicker
       setState(() { _passOk = false; _passMsg = 'Password minimal 6 karakter'; });
       return;
     }
+    if (!_otpPassSent || _otpPassCtrl.text.isEmpty) {
+      setState(() { _passOk = false; _passMsg = 'Minta dan masukkan kode OTP terlebih dahulu'; });
+      return;
+    }
     setState(() { _savingPass = true; _passMsg = null; });
     try {
       final dio = ApiClient.createDio();
       await dio.put('/users/change-password', data: {
         'currentPassword': _currentPassCtrl.text,
         'newPassword': _newPassCtrl.text,
+        'otp': _otpPassCtrl.text.trim(),
       });
       setState(() {
         _passOk = true;
@@ -91,6 +120,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> with SingleTicker
         _currentPassCtrl.clear();
         _newPassCtrl.clear();
         _confirmPassCtrl.clear();
+        _otpPassCtrl.clear();
+        _otpPassSent = false;
       });
     } on DioException catch (e) {
       setState(() { _passOk = false; _passMsg = e.response?.data['message'] ?? 'Gagal mengganti password'; });
@@ -332,6 +363,55 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> with SingleTicker
                 onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
               ),
             ),
+          ),
+          // OTP Section
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _label('Kode OTP Verifikasi *'),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: _otpPassCtrl,
+                      keyboardType: TextInputType.number,
+                      maxLength: 6,
+                      decoration: InputDecoration(
+                        prefixIcon: const Icon(Icons.security_outlined),
+                        hintText: _otpPassSent ? '6-digit kode dari email' : 'Minta kode OTP dahulu',
+                        counterText: '',
+                        enabled: _otpPassSent,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                children: [
+                  const SizedBox(height: 19),
+                  SizedBox(
+                    height: 48,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _otpPassSent ? AppTheme.success : null,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                      ),
+                      onPressed: _requestingOtp ? null : _requestChangePasswordOtp,
+                      icon: _requestingOtp
+                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : Icon(_otpPassSent ? Icons.check_circle_outline : Icons.send_rounded, size: 16),
+                      label: Text(
+                        _otpPassSent ? 'Terkirim' : 'Kirim OTP',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
           if (_passMsg != null) ...[
             const SizedBox(height: 10),

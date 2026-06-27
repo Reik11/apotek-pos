@@ -96,11 +96,29 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  // REGISTER (Pasien)
+  // REQUEST OTP PENDAFTARAN
+  Future<bool> requestRegisterOtp(String email) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      await _dio.post('/auth/register/request-otp', data: {'email': email});
+      state = state.copyWith(isLoading: false);
+      return true;
+    } on DioException catch (e) {
+      final message = e.response?.data['message'] ?? 'Gagal mengirim OTP. Email mungkin sudah terdaftar.';
+      state = state.copyWith(isLoading: false, error: message);
+      return false;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: 'Terjadi kesalahan: $e');
+      return false;
+    }
+  }
+
+  // REGISTER (Pasien) — dengan verifikasi OTP
   Future<bool> register({
     required String name,
     required String email,
     required String password,
+    required String otp,
   }) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
@@ -108,6 +126,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         'name': name,
         'email': email,
         'password': password,
+        'otp': otp,
         'role': 'PASIEN',
       });
 
@@ -120,7 +139,28 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = state.copyWith(isLoading: false, user: user, token: token);
       return true;
     } on DioException catch (e) {
-      final message = e.response?.data['message'] ?? 'Pendaftaran gagal. Email mungkin sudah terdaftar.';
+      final message = e.response?.data['message'] ?? 'Pendaftaran gagal. Cek kembali kode OTP Anda.';
+      state = state.copyWith(isLoading: false, error: message);
+      return false;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: 'Terjadi kesalahan: $e');
+      return false;
+    }
+  }
+
+  // REQUEST OTP GANTI PASSWORD
+  Future<bool> requestChangePasswordOtp() async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final token = state.token;
+      await _dio.post(
+        '/auth/change-password/request-otp',
+        options: Options(headers: token != null ? {'Authorization': 'Bearer $token'} : {}),
+      );
+      state = state.copyWith(isLoading: false);
+      return true;
+    } on DioException catch (e) {
+      final message = e.response?.data['message'] ?? 'Gagal mengirim OTP. Coba lagi.';
       state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {
