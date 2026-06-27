@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, Request, ForbiddenException } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ShiftsService } from './shifts.service';
 
@@ -6,6 +6,17 @@ import { ShiftsService } from './shifts.service';
 @UseGuards(AuthGuard('jwt'))
 export class ShiftsController {
   constructor(private readonly shiftsService: ShiftsService) {}
+
+  @Get()
+  findAll(@Request() req: any) {
+    if (req.user.role !== 'SUPER_ADMIN' && req.user.role !== 'ADMIN') {
+      throw new ForbiddenException(
+        'Hanya Admin dan Super Admin yang dapat melihat riwayat shift kasir',
+      );
+    }
+    const outletId = req.user.role === 'SUPER_ADMIN' ? undefined : req.user.outletId;
+    return this.shiftsService.findAll(outletId);
+  }
 
   @Get('active')
   getActiveShift(@Request() req: any) {

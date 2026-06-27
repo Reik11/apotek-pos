@@ -80,4 +80,18 @@ export class ShiftsService {
       },
     });
   }
+
+  // Get all cash shifts history
+  async findAll(outletId?: string) {
+    return this.prisma.cashShift.findMany({
+      where: {
+        outletId: outletId || undefined,
+      },
+      include: {
+        cashier: { select: { id: true, name: true, email: true } },
+        outlet: { select: { id: true, name: true } },
+      },
+      orderBy: { startTime: 'desc' },
+    });
+  }
 }
