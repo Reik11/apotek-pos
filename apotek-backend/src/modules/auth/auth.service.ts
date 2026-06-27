@@ -16,55 +16,80 @@ export class AuthService {
   // In-memory OTP storage
   private otps = new Map<string, { code: string; expiresAt: Date }>();
 
-  // SEND OTP TO EMAIL
+  // ============================================================
+  // OTP: LUPA PASSWORD (Forgot Password)
+  // ============================================================
   async sendOtp(email: string): Promise<boolean> {
-    // Check if email exists in database
     const user = await this.prisma.user.findUnique({ where: { email } });
     if (!user) throw new NotFoundException('Email tidak terdaftar');
 
-    // Generate 6 digit numeric code
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = new Date();
-    expiresAt.setMinutes(expiresAt.getMinutes() + 5); // 5 minutes validity
+    expiresAt.setMinutes(expiresAt.getMinutes() + 5);
 
-    this.otps.set(email, { code, expiresAt });
-
-    // Send email
+    this.otps.set(`forgot:${email}`, { code, expiresAt });
     return this.mailService.sendOtpEmail(email, code);
   }
 
-  // RESET PASSWORD WITH OTP
   async resetPasswordWithOtp(email: string, otp: string, newPassword: string): Promise<any> {
-    const activeOtp = this.otps.get(email);
-    if (!activeOtp) {
-      throw new BadRequestException('Kode OTP belum dikirim atau telah kedaluwarsa');
-    }
-
-    if (activeOtp.code !== otp) {
-      throw new BadRequestException('Kode OTP yang Anda masukkan salah');
-    }
-
+    const key = `forgot:${email}`;
+    const activeOtp = this.otps.get(key);
+    if (!activeOtp) throw new BadRequestException('Kode OTP belum dikirim atau telah kedaluwarsa');
+    if (activeOtp.code !== otp) throw new BadRequestException('Kode OTP yang Anda masukkan salah');
     if (new Date() > activeOtp.expiresAt) {
-      this.otps.delete(email);
+      this.otps.delete(key);
       throw new BadRequestException('Kode OTP telah kedaluwarsa. Silakan minta kode baru.');
     }
 
-    // OTP is valid, clear it
-    this.otps.delete(email);
-
-    // Hash new password
+    this.otps.delete(key);
     const hashedPassword = await bcrypt.hash(newPassword, 10);
-
-    // Update user password
-    await this.prisma.user.update({
-      where: { email },
-      data: { password: hashedPassword },
-    });
-
+    await this.prisma.user.update({ where: { email }, data: { password: hashedPassword } });
     return { message: 'Kata sandi berhasil diperbarui' };
   }
 
+  // ============================================================
+  // OTP: PENDAFTARAN (Register)
+  // ============================================================
+  async sendRegisterOtp(email: string): Promise<boolean> {
+    // Pastikan email belum terdaftar sebelum kirim OTP
+    const existing = await this.prisma.user.findUnique({ where: { email } });
+    if (existing) throw new ConflictException('Email sudah terdaftar. Silakan gunakan email lain.');
+
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date();
+    expiresAt.setMinutes(expiresAt.getMinutes() + 5);
+
+    this.otps.set(`register:${email}`, { code, expiresAt });
+    return this.mailService.sendOtpEmail(email, code);
+  }
+
+  // ============================================================
+  // OTP: GANTI PASSWORD (Change Password dari Profil)
+  // ============================================================
+  async sendChangePasswordOtp(email: string): Promise<boolean> {
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date();
+    expiresAt.setMinutes(expiresAt.getMinutes() + 5);
+
+    this.otps.set(`change-password:${email}`, { code, expiresAt });
+    return this.mailService.sendOtpEmail(email, code);
+  }
+
+  async verifyChangePasswordOtp(email: string, otp: string): Promise<void> {
+    const key = `change-password:${email}`;
+    const activeOtp = this.otps.get(key);
+    if (!activeOtp) throw new BadRequestException('Kode OTP belum dikirim atau telah kedaluwarsa');
+    if (activeOtp.code !== otp) throw new BadRequestException('Kode OTP salah');
+    if (new Date() > activeOtp.expiresAt) {
+      this.otps.delete(key);
+      throw new BadRequestException('Kode OTP telah kedaluwarsa. Silakan minta kode baru.');
+    }
+    this.otps.delete(key);
+  }
+
+  // ============================================================
   // GOOGLE LOGIN
+  // ============================================================
   async googleLogin(idToken: string): Promise<any> {
     try {
       const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -80,10 +105,8 @@ export class AuthService {
 
       const { email, name, picture } = payload;
 
-      // Find or create user
       let user = await this.prisma.user.findUnique({ where: { email } });
       if (!user) {
-        // Register new user with random password and default role PASIEN
         const randomPassword = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
         const hashedPassword = await bcrypt.hash(randomPassword, 10);
 
@@ -97,7 +120,6 @@ export class AuthService {
           },
         });
       } else {
-        // Update avatar if available and not set
         if (picture && !user.avatarUrl) {
           await this.prisma.user.update({
             where: { id: user.id },
@@ -119,16 +141,26 @@ export class AuthService {
     }
   }
 
-  // REGISTER
-  async register(name: string, email: string, password: string, role?: any) {
+  // ============================================================
+  // REGISTER (dengan verifikasi OTP)
+  // ============================================================
+  async register(name: string, email: string, password: string, otp: string, role?: any) {
+    // Verifikasi OTP pendaftaran
+    const key = `register:${email}`;
+    const activeOtp = this.otps.get(key);
+    if (!activeOtp) throw new BadRequestException('Kode OTP belum dikirim atau telah kedaluwarsa');
+    if (activeOtp.code !== otp) throw new BadRequestException('Kode OTP salah');
+    if (new Date() > activeOtp.expiresAt) {
+      this.otps.delete(key);
+      throw new BadRequestException('Kode OTP telah kedaluwarsa. Silakan minta kode baru.');
+    }
+    this.otps.delete(key);
+
     // Cek email sudah ada atau belum
     const existing = await this.prisma.user.findUnique({ where: { email } });
     if (existing) throw new ConflictException('Email sudah terdaftar');
 
-    // Enkripsi password
     const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Simpan user baru
     const user = await this.prisma.user.create({
       data: { name, email, password: hashedPassword, role },
     });
@@ -136,23 +168,24 @@ export class AuthService {
     return this.generateToken(user);
   }
 
+  // ============================================================
   // LOGIN
+  // ============================================================
   async login(email: string, password: string) {
-    // Cari user by email
     const user = await this.prisma.user.findUnique({ where: { email } });
     if (!user) throw new UnauthorizedException('Email atau password salah');
 
-    // Cek password
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) throw new UnauthorizedException('Email atau password salah');
 
-    // Cek user aktif
     if (!user.isActive) throw new UnauthorizedException('Akun tidak aktif');
 
     return this.generateToken(user);
   }
 
+  // ============================================================
   // GENERATE JWT TOKEN
+  // ============================================================
   private generateToken(user: any) {
     const payload = { sub: user.id, email: user.email, role: user.role };
     return {

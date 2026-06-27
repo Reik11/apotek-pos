@@ -3,14 +3,17 @@ import {
   UnauthorizedException, ConflictException, ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuthService } from '../auth/auth.service';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private authService: AuthService,
+  ) {}
 
   async updateProfile(userId: string, name: string, email: string) {
-    // Cek email sudah dipakai user lain
     const existing = await this.prisma.user.findFirst({
       where: { email, NOT: { id: userId } },
     });
@@ -25,19 +28,20 @@ export class UsersService {
 
   async changePassword(
     userId: string,
+    email: string,
     currentPassword: string,
     newPassword: string,
+    otp: string,
   ) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-    });
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException('User tidak ditemukan');
 
     // Verifikasi password lama
     const isMatch = await bcrypt.compare(currentPassword, user.password);
-    if (!isMatch) {
-      throw new UnauthorizedException('Password saat ini salah');
-    }
+    if (!isMatch) throw new UnauthorizedException('Password saat ini salah');
+
+    // Verifikasi OTP ganti password
+    await this.authService.verifyChangePasswordOtp(email, otp);
 
     // Hash password baru
     const hashed = await bcrypt.hash(newPassword, 10);
@@ -146,4 +150,4 @@ export class UsersService {
       },
     });
   }
-}
+}

@@ -62,8 +62,10 @@ export class UsersController {
   changePassword(@Request() req: any, @Body() body: any) {
     return this.usersService.changePassword(
       req.user.id,
+      req.user.email,
       body.currentPassword,
       body.newPassword,
+      body.otp,
     );
   }
 }
