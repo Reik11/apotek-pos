@@ -83,6 +83,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       return;
     }
 
+    final email = _emailController.text.trim();
+    if (!RegExp(r"^[a-zA-Z0-9.a-zA-Z0-9.!#$%&'*+-/=?^_`{|}~]+@[a-zA-Z0-9]+\.[a-zA-Z]+").hasMatch(email)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Format email tidak valid! (Harus memiliki simbol @ dan domain, misal: nama@domain.com)'),
+          backgroundColor: AppTheme.danger,
+        ),
+      );
+      return;
+    }
+
     final success = await ref.read(authProvider.notifier).login(
           _emailController.text.trim(),
           _passwordController.text,
