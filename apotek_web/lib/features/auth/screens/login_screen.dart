@@ -40,17 +40,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _handleGoogleLogin() async {
     try {
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-      if (googleUser == null) return;
+      if (googleUser == null) {
+        print("GOOGLE_USER is null!");
+        return;
+      }
 
+      print("GOOGLE_USER: email=${googleUser.email}, displayName=${googleUser.displayName}");
       GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      print("GOOGLE_AUTH: idToken=${googleAuth.idToken != null ? 'PRESENT (len=${googleAuth.idToken!.length})' : 'NULL'}, accessToken=${googleAuth.accessToken != null ? 'PRESENT' : 'NULL'}");
       String? idToken = googleAuth.idToken;
 
       // Jika idToken null, coba signInSilently untuk refresh credential
       if (idToken == null) {
+        print("idToken is null, trying signInSilently...");
         final silentUser = await _googleSignIn.signInSilently();
         if (silentUser != null) {
           googleAuth = await silentUser.authentication;
           idToken = googleAuth.idToken;
+          print("SILENT_AUTH: idToken=${idToken != null ? 'PRESENT' : 'NULL'}");
         }
       }
 
