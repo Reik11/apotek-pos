@@ -39,6 +39,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       }
 
       final loggedIn = authState.user != null;
+      final role = authState.user?.role;
       final isAuthRoute = state.matchedLocation == '/login' ||
           state.matchedLocation == '/register' ||
           state.matchedLocation == '/forgot-password' ||
@@ -49,17 +50,34 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           return '/login';
         }
       } else {
-        if (state.matchedLocation == '/login' ||
-            state.matchedLocation == '/register' ||
-            state.matchedLocation == '/') {
-          final role = authState.user!.role;
+        if (isAuthRoute) {
           if (role == 'PASIEN') {
             return '/pasien';
-          } else if (role == 'APOTEKER') {
-            return '/apoteker';
           } else {
             return '/dashboard';
           }
+        }
+
+        // Proteksi Halaman Web dari Pasien
+        final isWebRoute = state.matchedLocation == '/dashboard' ||
+            state.matchedLocation == '/kasir' ||
+            state.matchedLocation == '/inventory' ||
+            state.matchedLocation == '/reports' ||
+            state.matchedLocation == '/admin-reports' ||
+            state.matchedLocation == '/users' ||
+            state.matchedLocation == '/shifts' ||
+            state.matchedLocation == '/suppliers' ||
+            state.matchedLocation == '/purchase-orders' ||
+            state.matchedLocation == '/profile' ||
+            state.matchedLocation == '/outlets';
+
+        if (isWebRoute && role == 'PASIEN') {
+          return '/pasien';
+        }
+
+        // Proteksi Halaman Pasien dari Non-Pasien
+        if (state.matchedLocation == '/pasien' && role != 'PASIEN') {
+          return '/dashboard';
         }
       }
       return null;
