@@ -18,6 +18,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _obscurePassword = true;
 
   final GoogleSignIn _googleSignIn = GoogleSignIn(
+    clientId: '83173429765-c9cc3qhq3vrjo93o5ormpefrk224fnls.apps.googleusercontent.com',
     scopes: ['email', 'profile'],
   );
 
