@@ -33,6 +33,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(inventoryProvider.notifier).checkSyncStatus();
       ref.read(suppliersProvider.notifier).loadSuppliers();
+      ref.read(outletsProvider.notifier).loadOutlets();
       _syncTimer = Timer.periodic(const Duration(seconds: 5), (_) {
         if (mounted) {
           ref.read(inventoryProvider.notifier).checkSyncStatus();
@@ -52,6 +53,9 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
   @override
   Widget build(BuildContext context) {
     final inventoryState = ref.watch(inventoryProvider);
+    final outletsState = ref.watch(outletsProvider);
+    final authState = ref.watch(authProvider);
+    final isSuperAdmin = authState.user?.role == 'SUPER_ADMIN';
 
     return MainLayout(
       currentRoute: '/inventory',
@@ -124,15 +128,53 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
                 ),
                 const SizedBox(height: 16),
 
-                // Search bar
-                TextField(
-                  controller: _searchController,
-                  decoration: const InputDecoration(
-                    hintText: 'Cari nama obat...',
-                    prefixIcon: Icon(Icons.search),
-                  ),
-                  onChanged: (value) =>
-                      ref.read(inventoryProvider.notifier).search(value),
+                // Search & Filter Row
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 3,
+                      child: TextField(
+                        controller: _searchController,
+                        decoration: const InputDecoration(
+                          hintText: 'Cari nama obat...',
+                          prefixIcon: Icon(Icons.search),
+                        ),
+                        onChanged: (value) =>
+                            ref.read(inventoryProvider.notifier).search(value),
+                      ),
+                    ),
+                    if (isSuperAdmin) ...[
+                      const SizedBox(width: 16),
+                      Expanded(
+                        flex: 2,
+                        child: DropdownButtonFormField<String?>(
+                          value: inventoryState.selectedOutletId == "" || inventoryState.selectedOutletId == null
+                              ? null
+                              : inventoryState.selectedOutletId,
+                          decoration: const InputDecoration(
+                            labelText: 'Filter Cabang/Outlet',
+                            prefixIcon: Icon(Icons.store),
+                          ),
+                          hint: const Text('Semua Cabang / Global'),
+                          items: [
+                            const DropdownMenuItem<String?>(
+                              value: null,
+                              child: Text('Semua Cabang / Global'),
+                            ),
+                            ...outletsState.outlets.map((outlet) => DropdownMenuItem<String?>(
+                                  value: outlet['id'],
+                                  child: Text(outlet['name']?.toString() ?? 'Outlet'),
+                                )),
+                          ],
+                          onChanged: (value) {
+                            ref
+                                .read(inventoryProvider.notifier)
+                                .changeOutletFilter(value);
+                          },
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
                 const SizedBox(height: 8),
 

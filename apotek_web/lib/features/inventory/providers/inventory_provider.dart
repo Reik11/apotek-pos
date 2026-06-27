@@ -9,6 +9,7 @@ class InventoryState {
   final String? error;
   final String searchQuery;
   final bool isSyncing;
+  final String? selectedOutletId;
 
   InventoryState({
     this.drugs = const [],
@@ -16,6 +17,7 @@ class InventoryState {
     this.error,
     this.searchQuery = '',
     this.isSyncing = false,
+    this.selectedOutletId,
   });
 
   InventoryState copyWith({
@@ -24,6 +26,7 @@ class InventoryState {
     String? error,
     String? searchQuery,
     bool? isSyncing,
+    String? selectedOutletId,
   }) {
     return InventoryState(
       drugs: drugs ?? this.drugs,
@@ -31,6 +34,7 @@ class InventoryState {
       error: error,
       searchQuery: searchQuery ?? this.searchQuery,
       isSyncing: isSyncing ?? this.isSyncing,
+      selectedOutletId: selectedOutletId ?? this.selectedOutletId,
     );
   }
 
@@ -54,19 +58,35 @@ class InventoryNotifier extends StateNotifier<InventoryState> {
   }
 
   // Load semua obat
-  Future<void> loadDrugs() async {
+  Future<void> loadDrugs([String? outletId]) async {
+    final targetOutletId = outletId ?? state.selectedOutletId;
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final response = await _dio.get('/drugs');
+      final response = await _dio.get(
+        '/drugs',
+        queryParameters: {
+          if (targetOutletId != null && targetOutletId.isNotEmpty) 'outletId': targetOutletId,
+        },
+      );
       final drugs =
           (response.data as List).map((d) => DrugModel.fromJson(d)).toList();
-      state = state.copyWith(drugs: drugs, isLoading: false);
+      state = state.copyWith(
+        drugs: drugs,
+        isLoading: false,
+        selectedOutletId: targetOutletId,
+      );
     } on DioException catch (e) {
       state = state.copyWith(
         isLoading: false,
         error: e.response?.data['message'] ?? 'Gagal memuat data',
       );
     }
+  }
+
+  // Ganti filter outlet
+  Future<void> changeOutletFilter(String? outletId) async {
+    state = state.copyWith(selectedOutletId: outletId ?? "");
+    await loadDrugs(outletId ?? "");
   }
 
   // Update search query
