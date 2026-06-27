@@ -20,7 +20,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     clientId: '83173429765-c9cc3qhq3vrjo93o5ormpefrk224fnls.apps.googleusercontent.com',
     serverClientId: '83173429765-c9cc3qhq3vrjo93o5ormpefrk224fnls.apps.googleusercontent.com',
-    scopes: ['email', 'profile'],
+    scopes: ['email', 'profile', 'openid'],
   );
 
   @override
