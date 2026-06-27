@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import '../providers/auth_provider.dart';
 import '../../../core/theme/app_theme.dart';
 
@@ -16,11 +17,49 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
 
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    scopes: ['email', 'profile'],
+  );
+
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleGoogleLogin() async {
+    try {
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) return;
+
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final String? idToken = googleAuth.idToken;
+
+      if (idToken == null) {
+        throw Exception('Gagal mendapatkan ID Token dari Google.');
+      }
+
+      final success = await ref.read(authProvider.notifier).loginWithGoogle(idToken);
+      if (success && mounted) {
+        context.go('/');
+      } else if (mounted) {
+        final error = ref.read(authProvider).error ?? 'Gagal masuk menggunakan Google.';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error), backgroundColor: AppTheme.danger),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error Google Sign-In: $e\n\nTips: Google Client ID harus dikonfigurasi di web/index.html untuk rilis web.'),
+            backgroundColor: AppTheme.danger,
+            duration: const Duration(seconds: 6),
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _handleLogin() async {
@@ -311,12 +350,28 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerRight,
+            child: GestureDetector(
+              onTap: () => context.go('/forgot-password'),
+              child: const Text(
+                'Lupa Password?',
+                style: TextStyle(
+                  color: AppTheme.primary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  decoration: TextDecoration.underline,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
 
           // Tombol Login
           if (authState.isLoading)
             const Center(child: CircularProgressIndicator())
-          else
+          else ...[
             SizedBox(
               width: double.infinity,
               height: 50,
@@ -328,6 +383,35 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
               ),
             ),
+            const SizedBox(height: 16),
+            const Row(
+              children: [
+                Expanded(child: Divider()),
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  child: Text('atau', style: TextStyle(color: Colors.grey, fontSize: 13)),
+                ),
+                Expanded(child: Divider()),
+              ],
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: OutlinedButton.icon(
+                onPressed: _handleGoogleLogin,
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: Colors.grey.shade300),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                icon: const Icon(Icons.g_mobiledata_rounded, color: Colors.blue, size: 28),
+                label: const Text(
+                  'Masuk dengan Google',
+                  style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+          ],
 
           // Error
           if (authState.error != null) ...[

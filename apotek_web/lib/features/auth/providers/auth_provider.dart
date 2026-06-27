@@ -135,6 +135,70 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = AuthState(isInitialized: true);
   }
 
+  // REQUEST PASSWORD RESET OTP
+  Future<bool> requestPasswordResetOtp(String email) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      await _dio.post('/auth/forgot-password/request', data: {'email': email});
+      state = state.copyWith(isLoading: false);
+      return true;
+    } on DioException catch (e) {
+      final message = e.response?.data['message'] ?? 'Gagal meminta kode OTP. Cek kembali email Anda.';
+      state = state.copyWith(isLoading: false, error: message);
+      return false;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: 'Terjadi kesalahan: $e');
+      return false;
+    }
+  }
+
+  // RESET PASSWORD WITH OTP
+  Future<bool> resetPasswordWithOtp(String email, String otp, String newPassword) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      await _dio.post('/auth/forgot-password/reset', data: {
+        'email': email,
+        'otp': otp,
+        'newPassword': newPassword,
+      });
+      state = state.copyWith(isLoading: false);
+      return true;
+    } on DioException catch (e) {
+      final message = e.response?.data['message'] ?? 'Gagal mereset kata sandi. Cek kembali kode OTP.';
+      state = state.copyWith(isLoading: false, error: message);
+      return false;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: 'Terjadi kesalahan: $e');
+      return false;
+    }
+  }
+
+  // GOOGLE LOGIN
+  Future<bool> loginWithGoogle(String idToken) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final response = await _dio.post('/auth/google', data: {
+        'idToken': idToken,
+      });
+
+      final token = response.data['accessToken'];
+      final user = UserModel.fromJson(response.data['user']);
+
+      await _storage.write(key: 'access_token', value: token);
+      await _storage.write(key: 'user_data', value: jsonEncode(user.toJson()));
+
+      state = state.copyWith(isLoading: false, user: user, token: token);
+      return true;
+    } on DioException catch (e) {
+      final message = e.response?.data['message'] ?? 'Gagal masuk menggunakan Google.';
+      state = state.copyWith(isLoading: false, error: message);
+      return false;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: 'Terjadi kesalahan: $e');
+      return false;
+    }
+  }
+
   // UPDATE user data di state (setelah edit profil)
   void refreshUser(Map<String, dynamic> userData) async {
     final user = UserModel.fromJson(userData);
