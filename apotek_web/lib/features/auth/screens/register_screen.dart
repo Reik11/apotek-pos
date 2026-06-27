@@ -41,7 +41,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     super.dispose();
   }
 
-  Future<void> _handleRequestOtp() async {
+  bool _validateForm() {
     if (_nameController.text.isEmpty ||
         _emailController.text.isEmpty ||
         _passwordController.text.isEmpty ||
@@ -52,7 +52,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           backgroundColor: AppTheme.danger,
         ),
       );
-      return;
+      return false;
     }
 
     final email = _emailController.text.trim();
@@ -63,7 +63,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           backgroundColor: AppTheme.danger,
         ),
       );
-      return;
+      return false;
     }
 
     if (_passwordController.text != _confirmController.text) {
@@ -73,7 +73,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           backgroundColor: AppTheme.danger,
         ),
       );
-      return;
+      return false;
     }
 
     if (_passwordController.text.length < 6) {
@@ -83,7 +83,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           backgroundColor: AppTheme.danger,
         ),
       );
-      return;
+      return false;
     }
 
     if (!_agreeTerms) {
@@ -93,8 +93,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           backgroundColor: AppTheme.warning,
         ),
       );
-      return;
+      return false;
     }
+
+    return true;
+  }
+
+  Future<void> _handleRequestOtp() async {
+    if (!_validateForm()) return;
 
     final success = await ref
         .read(authProvider.notifier)
@@ -112,6 +118,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   }
 
   Future<void> _handleRegister() async {
+    if (!_validateForm()) return;
+    
     if (_otpController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -373,77 +381,68 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           ),
           const SizedBox(height: 20),
 
-          // OTP Section (muncul setelah OTP dikirim)
-          if (_otpSent) ...[
-            const SizedBox(height: 14),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppTheme.primary.withOpacity(0.06),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: AppTheme.primary.withOpacity(0.3)),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.mark_email_read_outlined, color: AppTheme.primary, size: 20),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'Kode OTP 6-digit telah dikirim ke ${_emailController.text}. Berlaku 5 menit.',
-                      style: TextStyle(fontSize: 12, color: AppTheme.primary),
+          // OTP Section (Selalu terlihat, dengan tombol Kirim OTP di samping kanannya)
+          const SizedBox(height: 14),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                flex: 3,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildLabel('Kode OTP Email *'),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: _otpController,
+                      keyboardType: TextInputType.number,
+                      maxLength: 6,
+                      decoration: const InputDecoration(
+                        hintText: '6-digit kode',
+                        prefixIcon: Icon(Icons.security_outlined, size: 18),
+                        counterText: '',
+                      ),
                     ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              SizedBox(
+                height: 48,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _otpSent ? AppTheme.success : null,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
                   ),
-                ],
+                  onPressed: authState.isLoading ? null : _handleRequestOtp,
+                  icon: Icon(_otpSent ? Icons.check_circle_outline : Icons.send_rounded, size: 16),
+                  label: Text(_otpSent ? 'Terkirim' : 'Kirim OTP'),
+                ),
               ),
-            ),
-            const SizedBox(height: 14),
-            _buildLabel('Kode OTP Email *'),
-            const SizedBox(height: 6),
-            TextField(
-              controller: _otpController,
-              keyboardType: TextInputType.number,
-              maxLength: 6,
-              decoration: const InputDecoration(
-                hintText: '6-digit kode dari email',
-                prefixIcon: Icon(Icons.security_outlined, size: 18),
-                counterText: '',
-              ),
+            ],
+          ),
+          if (_otpSent) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Kode OTP telah dikirim ke ${_emailController.text.trim()}. Berlaku 5 menit.',
+              style: const TextStyle(fontSize: 12, color: AppTheme.primary, fontWeight: FontWeight.w500),
             ),
           ],
 
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
 
-          // Tombol Daftar
+          // Tombol Daftar Akun
           if (authState.isLoading)
             const Center(child: CircularProgressIndicator())
-          else if (!_otpSent)
+          else
             SizedBox(
               width: double.infinity,
               height: 50,
               child: ElevatedButton.icon(
-                icon: const Icon(Icons.send_rounded, size: 18),
-                onPressed: _handleRequestOtp,
-                label: const Text('Kirim Kode OTP', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                icon: const Icon(Icons.how_to_reg_rounded, size: 18),
+                onPressed: _handleRegister,
+                label: const Text('Daftar Akun', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
               ),
-            )
-          else
-            Column(
-              children: [
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton.icon(
-                    icon: const Icon(Icons.how_to_reg_rounded, size: 18),
-                    onPressed: _handleRegister,
-                    label: const Text('Verifikasi & Daftar', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextButton(
-                  onPressed: _handleRequestOtp,
-                  child: Text('Kirim ulang OTP', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
-                ),
-              ],
             ),
 
           // Error
