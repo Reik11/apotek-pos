@@ -217,4 +217,26 @@ export class AuthService {
   async validateUser(userId: string) {
     return this.prisma.user.findUnique({ where: { id: userId } });
   }
+
+  // DEBUG SMTP CONNECTION
+  async testSmtpConnection() {
+    try {
+      const transporter = (this.mailService as any).transporter;
+      if (!transporter) {
+        return { success: false, error: 'SMTP transporter is null (not configured)' };
+      }
+      await transporter.verify();
+      return { success: true, message: 'SMTP connection successfully verified!' };
+    } catch (e) {
+      return {
+        success: false,
+        error: e.message,
+        stack: e.stack,
+        code: e.code,
+        response: e.response,
+        responseCode: e.responseCode,
+        command: e.command,
+      };
+    }
+  }
 }
