@@ -26,6 +26,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool _obscureNew = true;
   bool _obscureConfirm = true;
 
+  String? _activeSubPage; // null (menu), 'edit_profile', 'change_password'
+
   @override
   void initState() {
     super.initState();
@@ -145,400 +147,392 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
             const SizedBox(height: 24),
 
-            // ===== EDIT PROFIL =====
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                children: [
-                  // Section Edit Profil
-                  _SectionCard(
-                    title: 'Edit Profil',
-                    icon: Icons.person_outline,
-                    child: Column(
+            // ===== MENU PILIHAN / FORM AKTIF =====
+            if (_activeSubPage == null) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  children: [
+                    _buildMenuItem(
+                      icon: Icons.person_outline,
+                      title: 'Edit Profil',
+                      subtitle: 'Ubah nama dan email Anda',
+                      onTap: () => setState(() => _activeSubPage = 'edit_profile'),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildMenuItem(
+                      icon: Icons.lock_outline,
+                      title: 'Ganti Password',
+                      subtitle: 'Perbarui kata sandi akun Anda',
+                      onTap: () => setState(() => _activeSubPage = 'change_password'),
+                    ),
+                    if (user?.role == 'PASIEN') ...[
+                      const SizedBox(height: 12),
+                      _buildMenuItem(
+                        icon: Icons.location_on_outlined,
+                        title: 'Alamat Pengiriman',
+                        subtitle: 'Kelola alamat tujuan pengantaran obat',
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const AddressScreen()),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      _buildMenuItem(
+                        icon: Icons.assignment_turned_in_outlined,
+                        title: 'Laporan Pengaduan',
+                        subtitle: 'Kirimkan keluhan layanan atau masalah pesanan',
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const ReportScreen()),
+                          );
+                        },
+                      ),
+                    ],
+                    const SizedBox(height: 20),
+                    // Section Info Akun
+                    _SectionCard(
+                      title: 'Informasi Akun',
+                      icon: Icons.info_outline,
+                      child: Column(
+                        children: [
+                          _InfoRow(
+                              label: 'Role',
+                              value: _getRoleLabel(user?.role ?? '')),
+                          const Divider(),
+                          _InfoRow(label: 'ID Pengguna', value: user?.id ?? '-'),
+                          const Divider(),
+                          _InfoRow(
+                            label: 'Status',
+                            value: 'Aktif',
+                            valueColor: AppTheme.success,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    // Tombol Logout
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          final confirm = await showDialog<bool>(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              title: const Text('Konfirmasi Logout'),
+                              content:
+                                  const Text('Apakah kamu yakin ingin keluar?'),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context, false),
+                                  child: const Text('Batal'),
+                                ),
+                                ElevatedButton(
+                                  onPressed: () => Navigator.pop(context, true),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppTheme.danger,
+                                  ),
+                                  child: const Text('Logout'),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (confirm == true && mounted) {
+                            await ref.read(authProvider.notifier).logout();
+                            if (mounted) context.go('/login');
+                          }
+                        },
+                        icon: const Icon(Icons.logout_rounded, color: AppTheme.danger),
+                        label: const Text('Keluar dari Akun', style: TextStyle(color: AppTheme.danger)),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: AppTheme.danger),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                  ],
+                ),
+              ),
+            ] else if (_activeSubPage == 'edit_profile') ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
                       children: [
-                        // Success/Error message
-                        if (profileState.successMessage != null)
-                          _MessageBanner(
-                            message: profileState.successMessage!,
-                            isSuccess: true,
-                          ),
-                        if (profileState.error != null)
-                          _MessageBanner(
-                            message: profileState.error!,
-                            isSuccess: false,
-                          ),
-
-                        const SizedBox(height: 8),
-
-                        // Nama
-                        _InputField(
-                          controller: _nameController,
-                          label: 'Nama Lengkap',
-                          icon: Icons.badge_outlined,
+                        IconButton(
+                          icon: const Icon(Icons.arrow_back_rounded, color: AppTheme.primary),
+                          onPressed: () => setState(() => _activeSubPage = null),
                         ),
-                        const SizedBox(height: 16),
-
-                        // Email
-                        _InputField(
-                          controller: _emailController,
-                          label: 'Email',
-                          icon: Icons.email_outlined,
-                          keyboardType: TextInputType.emailAddress,
-                        ),
-                        const SizedBox(height: 20),
-
-                        // Tombol simpan
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            onPressed: profileState.isSaving
-                                ? null
-                                : () async {
-                                    final success = await ref
-                                        .read(profileProvider.notifier)
-                                        .updateProfile(
-                                          name: _nameController.text.trim(),
-                                          email: _emailController.text.trim(),
-                                        );
-                                    if (success && mounted) {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                        const SnackBar(
-                                          content: Text(
-                                              'Profil berhasil diperbarui!'),
-                                          backgroundColor: AppTheme.success,
-                                        ),
-                                      );
-                                    }
-                                  },
-                            icon: profileState.isSaving
-                                ? const SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white,
-                                    ),
-                                  )
-                                : const Icon(Icons.save_outlined),
-                            label: const Text('Simpan Perubahan'),
+                        const Text(
+                          'Kembali ke Menu',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.primary,
                           ),
                         ),
                       ],
                     ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // Section Ganti Password
-                  _SectionCard(
-                    title: 'Ganti Password',
-                    icon: Icons.lock_outline,
-                    child: Column(
+                    const SizedBox(height: 8),
+                    _SectionCard(
+                      title: 'Edit Profil',
+                      icon: Icons.person_outline,
+                      child: Column(
+                        children: [
+                          if (profileState.successMessage != null)
+                            _MessageBanner(
+                              message: profileState.successMessage!,
+                              isSuccess: true,
+                            ),
+                          if (profileState.error != null)
+                            _MessageBanner(
+                              message: profileState.error!,
+                              isSuccess: false,
+                            ),
+                          const SizedBox(height: 8),
+                          _InputField(
+                            controller: _nameController,
+                            label: 'Nama Lengkap',
+                            icon: Icons.badge_outlined,
+                          ),
+                          const SizedBox(height: 16),
+                          _InputField(
+                            controller: _emailController,
+                            label: 'Email',
+                            icon: Icons.email_outlined,
+                            keyboardType: TextInputType.emailAddress,
+                          ),
+                          const SizedBox(height: 20),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: profileState.isSaving
+                                  ? null
+                                  : () async {
+                                      final success = await ref
+                                          .read(profileProvider.notifier)
+                                          .updateProfile(
+                                            name: _nameController.text.trim(),
+                                            email: _emailController.text.trim(),
+                                          );
+                                      if (success && mounted) {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                                'Profil berhasil diperbarui!'),
+                                            backgroundColor: AppTheme.success,
+                                          ),
+                                        );
+                                      }
+                                    },
+                              icon: profileState.isSaving
+                                  ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : const Icon(Icons.save_outlined),
+                              label: const Text('Simpan Perubahan'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                  ],
+                ),
+              ),
+            ] else if (_activeSubPage == 'change_password') ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
                       children: [
-                        // Password lama
-                        _InputField(
-                          controller: _currentPassController,
-                          label: 'Password Saat Ini',
-                          icon: Icons.lock_outlined,
-                          obscureText: _obscureCurrent,
-                          suffixIcon: IconButton(
-                            icon: Icon(_obscureCurrent
-                                ? Icons.visibility_outlined
-                                : Icons.visibility_off_outlined),
-                            onPressed: () => setState(
-                                () => _obscureCurrent = !_obscureCurrent),
+                        IconButton(
+                          icon: const Icon(Icons.arrow_back_rounded, color: AppTheme.primary),
+                          onPressed: () => setState(() => _activeSubPage = null),
+                        ),
+                        const Text(
+                          'Kembali ke Menu',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.primary,
                           ),
                         ),
-                        const SizedBox(height: 16),
-
-                        // Password baru
-                        _InputField(
-                          controller: _newPassController,
-                          label: 'Password Baru',
-                          icon: Icons.lock_reset_outlined,
-                          obscureText: _obscureNew,
-                          suffixIcon: IconButton(
-                            icon: Icon(_obscureNew
-                                ? Icons.visibility_outlined
-                                : Icons.visibility_off_outlined),
-                            onPressed: () =>
-                                setState(() => _obscureNew = !_obscureNew),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    _SectionCard(
+                      title: 'Ganti Password',
+                      icon: Icons.lock_outline,
+                      child: Column(
+                        children: [
+                          _InputField(
+                            controller: _currentPassController,
+                            label: 'Password Saat Ini',
+                            icon: Icons.lock_outlined,
+                            obscureText: _obscureCurrent,
+                            suffixIcon: IconButton(
+                              icon: Icon(_obscureCurrent
+                                  ? Icons.visibility_outlined
+                                  : Icons.visibility_off_outlined),
+                              onPressed: () => setState(
+                                  () => _obscureCurrent = !_obscureCurrent),
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Konfirmasi password
-                        _InputField(
-                          controller: _confirmPassController,
-                          label: 'Konfirmasi Password Baru',
-                          icon: Icons.check_circle_outline,
-                          obscureText: _obscureConfirm,
-                          suffixIcon: IconButton(
-                            icon: Icon(_obscureConfirm
-                                ? Icons.visibility_outlined
-                                : Icons.visibility_off_outlined),
-                            onPressed: () => setState(
-                                () => _obscureConfirm = !_obscureConfirm),
+                          const SizedBox(height: 16),
+                          _InputField(
+                            controller: _newPassController,
+                            label: 'Password Baru',
+                            icon: Icons.lock_reset_outlined,
+                            obscureText: _obscureNew,
+                            suffixIcon: IconButton(
+                              icon: Icon(_obscureNew
+                                  ? Icons.visibility_outlined
+                                  : Icons.visibility_off_outlined),
+                              onPressed: () =>
+                                  setState(() => _obscureNew = !_obscureNew),
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 8),
-
-                        // Password strength hint
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: AppTheme.primary.withOpacity(0.05),
-                            borderRadius: BorderRadius.circular(8),
+                          const SizedBox(height: 16),
+                          _InputField(
+                            controller: _confirmPassController,
+                            label: 'Konfirmasi Password Baru',
+                            icon: Icons.check_circle_outline,
+                            obscureText: _obscureConfirm,
+                            suffixIcon: IconButton(
+                              icon: Icon(_obscureConfirm
+                                  ? Icons.visibility_outlined
+                                  : Icons.visibility_off_outlined),
+                              onPressed: () => setState(
+                                  () => _obscureConfirm = !_obscureConfirm),
+                            ),
                           ),
-                          child: const Row(
-                            children: [
-                              Icon(Icons.info_outline,
-                                  size: 14, color: AppTheme.primary),
-                              SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  'Password minimal 6 karakter',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: AppTheme.primary,
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: AppTheme.primary.withOpacity(0.05),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Row(
+                              children: [
+                                Icon(Icons.info_outline,
+                                    size: 14, color: AppTheme.primary),
+                                SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Password minimal 6 karakter',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: AppTheme.primary,
+                                    ),
                                   ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 20),
-
-                        // Tombol ganti password
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            onPressed: profileState.isSaving
-                                ? null
-                                : () async {
-                                    // Validasi
-                                    if (_currentPassController.text.isEmpty ||
-                                        _newPassController.text.isEmpty ||
-                                        _confirmPassController.text.isEmpty) {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                        const SnackBar(
-                                          content:
-                                              Text('Semua field harus diisi!'),
-                                          backgroundColor: AppTheme.danger,
-                                        ),
-                                      );
-                                      return;
-                                    }
-
-                                    if (_newPassController.text !=
-                                        _confirmPassController.text) {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                        const SnackBar(
-                                          content: Text(
-                                              'Password baru tidak cocok!'),
-                                          backgroundColor: AppTheme.danger,
-                                        ),
-                                      );
-                                      return;
-                                    }
-
-                                    if (_newPassController.text.length < 6) {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                        const SnackBar(
-                                          content: Text(
-                                              'Password minimal 6 karakter!'),
-                                          backgroundColor: AppTheme.danger,
-                                        ),
-                                      );
-                                      return;
-                                    }
-
-                                    final success = await ref
-                                        .read(profileProvider.notifier)
-                                        .changePassword(
-                                          currentPassword:
-                                              _currentPassController.text,
-                                          newPassword: _newPassController.text,
+                          const SizedBox(height: 20),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: profileState.isSaving
+                                  ? null
+                                  : () async {
+                                      if (_currentPassController.text.isEmpty ||
+                                          _newPassController.text.isEmpty ||
+                                          _confirmPassController.text.isEmpty) {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          const SnackBar(
+                                            content:
+                                                Text('Semua field harus diisi!'),
+                                            backgroundColor: AppTheme.danger,
+                                          ),
                                         );
-
-                                    if (success && mounted) {
-                                      _currentPassController.clear();
-                                      _newPassController.clear();
-                                      _confirmPassController.clear();
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                        const SnackBar(
-                                          content:
-                                              Text('Password berhasil diubah!'),
-                                          backgroundColor: AppTheme.success,
-                                        ),
-                                      );
-                                    }
-                                  },
-                            icon: profileState.isSaving
-                                ? const SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white,
-                                    ),
-                                  )
-                                : const Icon(Icons.lock_reset),
-                            label: const Text('Ubah Password'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppTheme.primaryLight,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // Section Alamat Pengiriman (Hanya Pasien)
-                  if (user?.role == 'PASIEN') ...[
-                    _SectionCard(
-                      title: 'Alamat Pengiriman',
-                      icon: Icons.location_on_outlined,
-                      child: Column(
-                        children: [
-                          const Text(
-                            'Kelola alamat pengiriman untuk pemesanan obat bebas Anda.',
-                            style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
-                          ),
-                          const SizedBox(height: 12),
-                          SizedBox(
-                            width: double.infinity,
-                            child: OutlinedButton.icon(
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (_) => const AddressScreen()),
-                                );
-                              },
-                              icon: const Icon(Icons.map_outlined, color: AppTheme.primary),
-                              label: const Text('Kelola Alamat', style: TextStyle(color: AppTheme.primary)),
-                              style: OutlinedButton.styleFrom(
-                                side: const BorderSide(color: AppTheme.primary),
-                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                        return;
+                                      }
+                                      if (_newPassController.text !=
+                                          _confirmPassController.text) {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                                'Password baru tidak cocok!'),
+                                            backgroundColor: AppTheme.danger,
+                                          ),
+                                        );
+                                        return;
+                                      }
+                                      if (_newPassController.text.length < 6) {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                                'Password minimal 6 karakter!'),
+                                            backgroundColor: AppTheme.danger,
+                                          ),
+                                        );
+                                        return;
+                                      }
+                                      final success = await ref
+                                          .read(profileProvider.notifier)
+                                          .changePassword(
+                                            currentPassword:
+                                                _currentPassController.text,
+                                            newPassword: _newPassController.text,
+                                          );
+                                      if (success && mounted) {
+                                        _currentPassController.clear();
+                                        _newPassController.clear();
+                                        _confirmPassController.clear();
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          const SnackBar(
+                                            content:
+                                                Text('Password berhasil diubah!'),
+                                            backgroundColor: AppTheme.success,
+                                          ),
+                                        );
+                                      }
+                                    },
+                              icon: profileState.isSaving
+                                  ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : const Icon(Icons.lock_reset),
+                              label: const Text('Ubah Password'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppTheme.primaryLight,
                               ),
                             ),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    _SectionCard(
-                      title: 'Laporan Pengaduan',
-                      icon: Icons.assignment_turned_in_outlined,
-                      child: Column(
-                        children: [
-                          const Text(
-                            'Kirimkan keluhan layanan, masalah pesanan, atau kualitas obat ke Admin.',
-                            style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
-                          ),
-                          const SizedBox(height: 12),
-                          SizedBox(
-                            width: double.infinity,
-                            child: OutlinedButton.icon(
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (_) => const ReportScreen()),
-                                );
-                              },
-                              icon: const Icon(Icons.message_outlined, color: AppTheme.primary),
-                              label: const Text('Kirim/Lihat Laporan', style: TextStyle(color: AppTheme.primary)),
-                              style: OutlinedButton.styleFrom(
-                                side: const BorderSide(color: AppTheme.primary),
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 32),
                   ],
-
-                  // Section Info Akun
-                  _SectionCard(
-                    title: 'Informasi Akun',
-                    icon: Icons.info_outline,
-                    child: Column(
-                      children: [
-                        _InfoRow(
-                            label: 'Role',
-                            value: _getRoleLabel(user?.role ?? '')),
-                        const Divider(),
-                        _InfoRow(label: 'ID Pengguna', value: user?.id ?? '-'),
-                        const Divider(),
-                        _InfoRow(
-                          label: 'Status',
-                          value: 'Aktif',
-                          valueColor: AppTheme.success,
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // Tombol Logout
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: () async {
-                        // Dialog konfirmasi logout
-                        final confirm = await showDialog<bool>(
-                          context: context,
-                          builder: (context) => AlertDialog(
-                            title: const Text('Konfirmasi Logout'),
-                            content:
-                                const Text('Apakah kamu yakin ingin keluar?'),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(context, false),
-                                child: const Text('Batal'),
-                              ),
-                              ElevatedButton(
-                                onPressed: () => Navigator.pop(context, true),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppTheme.danger,
-                                ),
-                                child: const Text('Logout'),
-                              ),
-                            ],
-                          ),
-                        );
-
-                        if (confirm == true && mounted) {
-                          await ref.read(authProvider.notifier).logout();
-                          if (mounted) context.go('/login');
-                        }
-                      },
-                      icon: const Icon(Icons.logout, color: AppTheme.danger),
-                      label: const Text(
-                        'Logout',
-                        style: TextStyle(color: AppTheme.danger),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: AppTheme.danger),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 32),
-                ],
+                ),
               ),
-            ),
+            ]
           ],
         ),
       ),
@@ -558,6 +552,79 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       default:
         return role;
     }
+  }
+
+  Widget _buildMenuItem({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, color: AppTheme.primary, size: 20),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 16,
+                  color: AppTheme.textSecondary,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
