@@ -18,7 +18,8 @@ export class MailService {
         port: parseInt(port, 10),
         secure: parseInt(port, 10) === 465, // true for 465, false for other ports
         auth: { user, pass },
-      });
+        family: 4, // Paksa IPv4 untuk menghindari error ENETUNREACH pada server Render yang tidak mendukung IPv6
+      } as any);
       this.logger.log('SMTP Transporter configured successfully');
     } else {
       this.logger.warn(
