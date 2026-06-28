@@ -17,6 +17,8 @@ class UsersScreen extends ConsumerStatefulWidget {
 class _UsersScreenState extends ConsumerState<UsersScreen> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
+  String _selectedRoleFilter = 'SEMUA';
+  String _sortBy = 'NAME_ASC';
 
   static const _roles = ['ADMIN', 'APOTEKER', 'KASIR', 'PASIEN'];
   static const _shifts = ['PAGI', 'SIANG', 'MALAM', 'OFF'];
@@ -40,11 +42,41 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
     final outletsState = ref.watch(outletsProvider);
     final currentUser = ref.watch(authProvider).user;
     final filtered = usersState.users.where((u) {
+      // 1. Search Query filter
       final q = _searchQuery.toLowerCase();
-      return (u['name'] ?? '').toLowerCase().contains(q) ||
+      final matchesSearch = (u['name'] ?? '').toLowerCase().contains(q) ||
           (u['email'] ?? '').toLowerCase().contains(q) ||
           (u['role'] ?? '').toLowerCase().contains(q);
+
+      if (!matchesSearch) return false;
+
+      // 2. Role filter
+      if (_selectedRoleFilter != 'SEMUA') {
+        if (u['role'] != _selectedRoleFilter) return false;
+      }
+
+      return true;
     }).toList();
+
+    // 3. Sorting logic
+    filtered.sort((a, b) {
+      if (_sortBy == 'NAME_ASC') {
+        return (a['name'] as String? ?? '').toLowerCase().compareTo((b['name'] as String? ?? '').toLowerCase());
+      } else if (_sortBy == 'NAME_DESC') {
+        return (b['name'] as String? ?? '').toLowerCase().compareTo((a['name'] as String? ?? '').toLowerCase());
+      } else if (_sortBy == 'DATE_NEWEST') {
+        final aDate = a['createdAt'] != null ? DateTime.parse(a['createdAt']) : DateTime(1970);
+        final bDate = b['createdAt'] != null ? DateTime.parse(b['createdAt']) : DateTime(1970);
+        return bDate.compareTo(aDate);
+      } else if (_sortBy == 'DATE_OLDEST') {
+        final aDate = a['createdAt'] != null ? DateTime.parse(a['createdAt']) : DateTime(1970);
+        final bDate = b['createdAt'] != null ? DateTime.parse(b['createdAt']) : DateTime(1970);
+        return aDate.compareTo(bDate);
+      } else if (_sortBy == 'ROLE') {
+        return (a['role'] as String? ?? '').compareTo(b['role'] as String? ?? '');
+      }
+      return 0;
+    });
 
     return MainLayout(
       currentRoute: '/users',
@@ -84,17 +116,70 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
             ),
           ),
 
-          // Search bar
+          // Search, Filter & Sort Bar
           Container(
             color: Colors.white,
             padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
-            child: TextField(
-              controller: _searchController,
-              decoration: const InputDecoration(
-                hintText: 'Cari nama, email, atau role...',
-                prefixIcon: Icon(Icons.search),
-              ),
-              onChanged: (v) => setState(() => _searchQuery = v),
+            child: Row(
+              children: [
+                // Search Input
+                Expanded(
+                  flex: 3,
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: const InputDecoration(
+                      hintText: 'Cari nama atau email...',
+                      prefixIcon: Icon(Icons.search),
+                    ),
+                    onChanged: (v) => setState(() => _searchQuery = v),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                // Role Filter Dropdown
+                Expanded(
+                  flex: 1,
+                  child: DropdownButtonFormField<String>(
+                    value: _selectedRoleFilter,
+                    decoration: const InputDecoration(
+                      labelText: 'Filter Role',
+                      prefixIcon: Icon(Icons.filter_list_rounded),
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'SEMUA', child: Text('Semua Role')),
+                      DropdownMenuItem(value: 'SUPER_ADMIN', child: Text('Super Admin')),
+                      DropdownMenuItem(value: 'ADMIN', child: Text('Admin')),
+                      DropdownMenuItem(value: 'APOTEKER', child: Text('Apoteker')),
+                      DropdownMenuItem(value: 'KASIR', child: Text('Kasir')),
+                      DropdownMenuItem(value: 'PASIEN', child: Text('Pasien')),
+                    ],
+                    onChanged: (v) {
+                      if (v != null) setState(() => _selectedRoleFilter = v);
+                    },
+                  ),
+                ),
+                const SizedBox(width: 16),
+                // Sort Dropdown
+                Expanded(
+                  flex: 1,
+                  child: DropdownButtonFormField<String>(
+                    value: _sortBy,
+                    decoration: const InputDecoration(
+                      labelText: 'Urutkan',
+                      prefixIcon: Icon(Icons.sort_rounded),
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'NAME_ASC', child: Text('Nama (A-Z)')),
+                      DropdownMenuItem(value: 'NAME_DESC', child: Text('Nama (Z-A)')),
+                      DropdownMenuItem(value: 'DATE_NEWEST', child: Text('Terdaftar (Terbaru)')),
+                      DropdownMenuItem(value: 'DATE_OLDEST', child: Text('Terdaftar (Terlama)')),
+                      DropdownMenuItem(value: 'ROLE', child: Text('Role')),
+                    ],
+                    onChanged: (v) {
+                      if (v != null) setState(() => _sortBy = v);
+                    },
+                  ),
+                ),
+              ],
             ),
           ),
 
