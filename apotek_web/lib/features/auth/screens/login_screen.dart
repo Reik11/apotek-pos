@@ -51,14 +51,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       print("GOOGLE_AUTH: idToken=${googleAuth.idToken != null ? 'PRESENT (len=${googleAuth.idToken!.length})' : 'NULL'}, accessToken=${googleAuth.accessToken != null ? 'PRESENT' : 'NULL'}");
       String? idToken = googleAuth.idToken;
 
-      // Jika idToken null, coba signInSilently untuk refresh credential
+      // Jika idToken null, coba signInSilently dengan reAuthenticate: true untuk me-refresh credential di web
       if (idToken == null) {
-        print("idToken is null, trying signInSilently...");
-        final silentUser = await _googleSignIn.signInSilently();
+        print("idToken is null, trying signInSilently with reAuthenticate: true...");
+        final silentUser = await _googleSignIn.signInSilently(reAuthenticate: true);
         if (silentUser != null) {
           googleAuth = await silentUser.authentication;
           idToken = googleAuth.idToken;
-          print("SILENT_AUTH: idToken=${idToken != null ? 'PRESENT' : 'NULL'}");
+          print("SILENT_AUTH (reAuthenticate): idToken=${idToken != null ? 'PRESENT' : 'NULL'}");
         }
       }
 
