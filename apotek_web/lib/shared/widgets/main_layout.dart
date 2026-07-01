@@ -149,6 +149,16 @@ class MainLayout extends ConsumerWidget {
       _NavItem(
           icon: Icons.bar_chart_rounded, label: 'Laporan', route: '/reports'),
       _NavItem(
+          icon: Icons.auto_awesome_rounded,
+          label: 'Analisis Tren',
+          route: '/analytics',
+          roles: ['SUPER_ADMIN', 'ADMIN']),
+      _NavItem(
+          icon: Icons.sync_rounded,
+          label: 'Sinkronisasi Sistem',
+          route: '/system-sync',
+          roles: ['SUPER_ADMIN']),
+      _NavItem(
           icon: Icons.message_rounded,
           label: 'Pengaduan',
           route: '/admin-reports',

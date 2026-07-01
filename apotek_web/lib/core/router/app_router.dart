@@ -14,6 +14,8 @@ import '../../features/kasir/screens/shifts_history_screen.dart';
 import '../../features/inventory/screens/inventory_screen.dart';
 import '../../features/reports/screens/reports_screen.dart';
 import '../../features/reports/screens/user_reports_screen.dart';
+import '../../features/reports/screens/system_sync_screen.dart';
+import '../../features/reports/screens/analytics_dashboard_screen.dart';
 import '../../features/users/screens/users_screen.dart';
 import '../../features/suppliers/screens/suppliers_screen.dart';
 import '../../features/purchase_orders/screens/purchase_orders_screen.dart';
@@ -70,6 +72,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             state.matchedLocation == '/suppliers' ||
             state.matchedLocation == '/purchase-orders' ||
             state.matchedLocation == '/profile' ||
+            state.matchedLocation == '/system-sync' ||
+            state.matchedLocation == '/analytics' ||
             state.matchedLocation == '/outlets';
 
         if (isWebRoute && role == 'PASIEN') {
@@ -125,6 +129,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/reports',
             pageBuilder: (context, state) => _fadeTransitionPage(state, const ReportsScreen()),
+          ),
+          GoRoute(
+            path: '/system-sync',
+            pageBuilder: (context, state) => _fadeTransitionPage(state, const SystemSyncScreen()),
+          ),
+          GoRoute(
+            path: '/analytics',
+            pageBuilder: (context, state) => _fadeTransitionPage(state, const AnalyticsDashboardScreen()),
           ),
           GoRoute(
             path: '/admin-reports',

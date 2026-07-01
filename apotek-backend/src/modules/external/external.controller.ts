@@ -1,11 +1,14 @@
 import {
   Controller, Get, Post,
-  Query, Param, UseGuards,
+  Query, Param, UseGuards, Request, ForbiddenException,
+  UseInterceptors, UploadedFile
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { RxNormService } from './rxnorm.service';
 import { FdaService } from './fda.service';
 import { DrugSyncService } from './drug-sync.service';
+import { OcrService } from './ocr.service';
 import { Body } from '@nestjs/common';
 
 @Controller('external')
@@ -15,6 +18,7 @@ export class ExternalController {
     private rxNormService: RxNormService,
     private fdaService: FdaService,
     private drugSyncService: DrugSyncService,
+    private ocrService: OcrService,
   ) {}
 
   // Cari obat di RxNorm
@@ -98,27 +102,64 @@ export class ExternalController {
 
   // ===== SYNC ENDPOINTS =====
 
-  // Cek status sync
-  @Get('sync/status')
-  getSyncStatus() {
-    return this.drugSyncService.getSyncStatus();
+  // Trigger sync manual (Hanya Super Admin)
+  @Post('sync-trigger')
+  async triggerSync(@Request() req: any, @Body() body: { category: string }) {
+    if (req.user.role !== 'SUPER_ADMIN') {
+      throw new ForbiddenException('Hanya Super Admin yang dapat memicu sinkronisasi manual.');
+    }
+    return this.drugSyncService.triggerSync(body.category || 'all', req.user.name);
   }
 
-  // Trigger sync semua obat manual
-  @Post('sync/all')
-  syncAllDrugs() {
-    // Jalankan di background, tidak perlu tunggu
-    this.drugSyncService.syncAllDrugs();
-    return {
-      message: 'Sync dimulai di background!',
-      note: 'Cek status di GET /external/sync/status',
-    };
+  // Ambil riwayat log sinkronisasi
+  @Get('sync-logs')
+  getSyncLogs() {
+    return this.drugSyncService.getSyncLogs();
   }
 
-  // Sync satu obat by ID
-  @Post('sync/drug/:id')
-  async syncOneDrug(@Param('id') id: string) {
-    await this.drugSyncService.syncOneDrugById(id);
-    return { message: 'Sync berhasil!' };
+  // Ambil tren epidemiologi nasional
+  @Get('trends')
+  getEpidemiologyTrends() {
+    return this.drugSyncService.getEpidemiologyTrends();
   }
-}
+
+  // Ambil obat terlaris di apotek
+  @Get('top-selling')
+  getTopSellingDrugs() {
+    return this.drugSyncService.getTopSellingDrugs();
+  }
+
+  // Scan gambar resep offline menggunakan ONNX
+  @Post('ocr-prescription')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadAndScan(@UploadedFile() file: any) {
+    if (!file) {
+      throw new Error('File resep tidak boleh kosong.');
+    }
+    const detectedText = await this.ocrService.scanPrescriptionImage(file.buffer);
+    
+    const lines = detectedText
+      .split('\n')
+      .map((l) => l.trim())
+      .filter((l) => l.length > 2);
+
+    const drugs: any[] = [];
+
+    for (const line of lines.slice(0, 10)) {
+      try {
+        const results = await this.rxNormService.searchByName(line);
+        if (results.length > 0) {
+          drugs.push({
+            detectedName: line,
+            rxnorm: results[0],
+            localDrugs: [],
+          });
+        }
+      } catch (e) {
+        continue;
+      }
+    }
+
+    return { rawText: detectedText, drugs };
+  }
+}

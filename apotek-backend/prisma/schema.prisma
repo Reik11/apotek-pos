@@ -422,3 +422,42 @@ model Outlet {
   shifts       CashShift[]
   drugs        Drug[]
 }
+
+// ==================
+// DATA REFERENSI EKSTERNAL & LOG
+// ==================
+model DrugReference {
+  id              String    @id @default(uuid())
+  name            String    @unique
+  genericName     String?
+  activeIngredient String?
+  description     String?
+  indications     String?
+  sideEffects     String?
+  dosage          String?
+  warnings        String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model EpidemiologyTrend {
+  id              String   @id @default(uuid())
+  indicatorCode   String
+  indicatorName   String
+  spatialValue    String   // Misal: "IDN" untuk Indonesia
+  year            Int
+  value           Float
+  diseaseCategory String   // Misal: "MALARIA", "TB", "DENGUE"
+  lastSync        DateTime @default(now())
+}
+
+model SyncLog {
+  id                 String    @id @default(uuid())
+  category           String    // Misal: "DRUGS" atau "EPIDEMIOLOGY"
+  status             String    // "SUCCESS" atau "FAILED"
+  scrapedItemsCount  Int       @default(0)
+  startedAt          DateTime  @default(now())
+  completedAt        DateTime?
+  triggeredBy        String    // Nama pengguna / "SYSTEM" (Jika Scheduler)
+  errorMessage       String?
+}

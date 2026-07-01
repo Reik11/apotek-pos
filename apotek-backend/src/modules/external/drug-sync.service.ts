@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
-import { RxNormService } from './rxnorm.service';
-import { FdaService } from './fda.service';
+import { exec } from 'child_process';
+import axios from 'axios';
 
 @Injectable()
 export class DrugSyncService {
@@ -11,149 +11,117 @@ export class DrugSyncService {
 
   constructor(
     private prisma: PrismaService,
-    private rxNormService: RxNormService,
-    private fdaService: FdaService,
   ) {}
 
-  // Jadwal otomatis: Senin & Kamis jam 02:00 pagi
-  @Cron('0 2 * * 1,4')
+  // Jadwal otomatis: Setiap Hari Minggu jam 00:00 (Tengah Malam)
+  @Cron('0 0 * * 0')
   async scheduledSync() {
-    this.logger.log('⏰ Scheduled sync dimulai...');
-    await this.syncAllDrugs();
+    this.logger.log('⏰ Scheduled sync otomatis dimulai...');
+    await this.triggerSync('all', 'SYSTEM');
   }
 
-  // Sync semua obat
-  async syncAllDrugs(): Promise<void> {
-    if (this.isSyncing) {
-      this.logger.warn('⚠️ Sync sedang berjalan, skip!');
-      return;
-    }
+  // Pemicu Sinkronisasi (Manual / Otomatis)
+  async triggerSync(category: string, username: string): Promise<{ message: string }> {
+    const isProd = process.env.NODE_ENV === 'production';
+    
+    if (isProd) {
+      // PROD: Trigger melalui GitHub Actions
+      const owner = 'Reik11'; // Owner repo GitHub
+      const repo = 'apotek-pos';   // Nama repo GitHub
+      const pat = process.env.GITHUB_PAT; // Personal Access Token disimpan di Env
 
-    this.isSyncing = true;
-    this.logger.log('🔄 Mulai sync data obat dari API...');
+      if (!pat) {
+        this.logger.error('❌ GITHUB_PAT environment variable is missing in Production.');
+        throw new Error('Konfigurasi token GitHub tidak ditemukan di server.');
+      }
 
-    try {
-      const drugs = await this.prisma.drug.findMany({
-        where: { isActive: true },
-        select: {
-          id: true,
-          name: true,
-          genericName: true,
-          rxcui: true,
-        },
+      try {
+        await axios.post(
+          `https://api.github.com/repos/${owner}/${repo}/dispatches`,
+          {
+            event_type: 'trigger-scraper',
+            client_payload: {
+              category: category,
+              triggeredBy: username,
+            },
+          },
+          {
+            headers: {
+              Authorization: `token ${pat}`,
+              Accept: 'application/vnd.github.v3+json',
+            },
+          },
+        );
+        this.logger.log(`🚀 GitHub Action Dispatch berhasil dikirim oleh ${username} untuk kategori ${category}`);
+        return { message: 'Sinkronisasi cloud telah dipicu di GitHub Actions!' };
+      } catch (error: any) {
+        this.logger.error('❌ Gagal men-trigger GitHub Action dispatch:', error.message);
+        throw new Error(`Gagal menghubungi GitHub: ${error.message}`);
+      }
+    } else {
+      // DEV (LOKAL): Spawn child process menjalankan D:\!semester6\!a\scrap_api\scraper.js
+      const scriptPath = 'D:\\!semester6\\!a\\scrap_api\\scraper.js';
+      const command = `node "${scriptPath}" --category=${category} --triggered-by="${username}"`;
+      
+      this.logger.log(`💻 Menjalankan scraper lokal di background: ${command}`);
+      
+      // Gunakan exec untuk spawn process mandiri di OS (async)
+      exec(command, (error, stdout, stderr) => {
+        if (error) {
+          this.logger.error(`❌ Scraper lokal gagal dieksekusi: ${error.message}`);
+          return;
+        }
+        if (stderr) {
+          this.logger.warn(`⚠️ Scraper lokal standard error: ${stderr}`);
+        }
+        this.logger.log(`✅ Scraper lokal berhasil selesai:\n${stdout}`);
       });
 
-      this.logger.log(`📦 Total obat: ${drugs.length}`);
-
-      let success = 0;
-      let fail = 0;
-
-      for (const drug of drugs) {
-        try {
-          await this.syncOneDrug(drug);
-          success++;
-          // Delay 600ms agar tidak spam API
-          await this.delay(600);
-        } catch (e) {
-          this.logger.error(`❌ Gagal sync ${drug.name}`);
-          fail++;
-        }
-      }
-
-      this.logger.log(
-        `✅ Sync selesai! Berhasil: ${success}, Gagal: ${fail}`,
-      );
-    } finally {
-      this.isSyncing = false;
+      return { message: 'Sinkronisasi lokal telah dijalankan di background!' };
     }
   }
 
-  // Sync satu obat by object
-  async syncOneDrug(drug: {
-    id: string;
-    name: string;
-    genericName?: string | null;
-    rxcui?: string | null;
-  }): Promise<void> {
-    const searchName = drug.genericName || drug.name;
-    const updateData: any = { lastApiSync: new Date() };
+  // Ambil data log sinkronisasi
+  async getSyncLogs() {
+    return this.prisma.syncLog.findMany({
+      orderBy: { startedAt: 'desc' },
+      take: 20,
+    });
+  }
 
-    // 1. Cari di RxNorm
-    try {
-      const rxnormResults =
-        await this.rxNormService.searchByName(searchName);
+  // Ambil tren epidemiologi nasional
+  async getEpidemiologyTrends() {
+    return this.prisma.epidemiologyTrend.findMany({
+      where: { spatialValue: 'IDN' },
+      orderBy: [
+        { diseaseCategory: 'asc' },
+        { year: 'asc' }
+      ],
+    });
+  }
 
-      if (rxnormResults.length > 0) {
-        const first = rxnormResults[0];
-        updateData.rxcui = first.rxcui;
-        updateData.rxnormName = first.name;
-
-        // Ambil ingredients
-        await this.delay(300);
-        const detail = await this.rxNormService.getDrugDetails(
-          first.rxcui,
-        );
-        if (detail?.ingredients) {
-          updateData.rxnormIngredients = detail.ingredients;
-        }
-      }
-    } catch (e) {
-      this.logger.warn(`RxNorm gagal untuk ${drug.name}`);
-    }
-
-    // 2. Cari di FDA
-    try {
-      await this.delay(300);
-      const fda = await this.fdaService.getDrugLabel(searchName);
-      if (fda) {
-        updateData.fdaIndications =
-          fda.indications?.substring(0, 1000) ?? null;
-        updateData.fdaSideEffects =
-          fda.sideEffects?.substring(0, 500) ?? null;
-        updateData.fdaDosage =
-          fda.dosage?.substring(0, 500) ?? null;
-        updateData.fdaWarnings =
-          fda.warnings?.substring(0, 500) ?? null;
-        updateData.fdaContraindications =
-          fda.contraindications?.substring(0, 500) ?? null;
-      }
-    } catch (e) {
-      this.logger.warn(`FDA gagal untuk ${drug.name}`);
-    }
-
-    // 3. Simpan ke database
-    await this.prisma.drug.update({
-      where: { id: drug.id },
-      data: updateData,
+  // Ambil obat-obat paling laris di apotek lokal
+  async getTopSellingDrugs() {
+    const items = await this.prisma.transactionItem.groupBy({
+      by: ['drugId'],
+      _sum: { quantity: true },
+      orderBy: { _sum: { quantity: 'desc' } },
+      take: 8,
     });
 
-    this.logger.log(`✅ ${drug.name} — sync berhasil`);
+    return Promise.all(
+      items.map(async (item) => {
+        const drug = await this.prisma.drug.findUnique({
+          where: { id: item.drugId },
+          select: { name: true, genericName: true },
+        });
+        return {
+          drugId: item.drugId,
+          name: drug?.name || 'Obat Tidak Dikenal',
+          genericName: drug?.genericName || '-',
+          totalSold: item._sum.quantity || 0,
+        };
+      }),
+    );
   }
-
-  // Sync satu obat by ID
-  async syncOneDrugById(drugId: string): Promise<void> {
-    const drug = await this.prisma.drug.findUnique({
-      where: { id: drugId },
-      select: {
-        id: true,
-        name: true,
-        genericName: true,
-        rxcui: true,
-      },
-    });
-    if (!drug) return;
-    await this.syncOneDrug(drug);
-  }
-
-  // Cek status sync
-  getSyncStatus() {
-    return {
-      isSyncing: this.isSyncing,
-      schedule: 'Senin & Kamis jam 02:00 pagi',
-    };
-  }
-
-  private delay(ms: number) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-  }
-}
+}
