@@ -27,7 +27,7 @@ export class DrugSyncService {
     if (isProd) {
       // PROD: Trigger melalui GitHub Actions
       const owner = 'Reik11'; // Owner repo GitHub
-      const repo = 'apotek-pos';   // Nama repo GitHub
+      const repo = 'scrap_api';   // Nama repo GitHub (Solusi B)
       const pat = process.env.GITHUB_PAT; // Personal Access Token disimpan di Env
 
       if (!pat) {
