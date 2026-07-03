@@ -207,6 +207,8 @@ model Order {
   prescription   Prescription?  @relation(fields: [prescriptionId], references: [id])
   outletId       String?
   outlet         Outlet?        @relation(fields: [outletId], references: [id])
+  snapToken      String?
+  snapUrl        String?
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 

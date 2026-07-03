@@ -1,29 +1,46 @@
 import { Injectable, Logger } from '@nestjs/common';
+import axios from 'axios';
 import * as nodemailer from 'nodemailer';
 
 @Injectable()
 export class MailService {
   private readonly logger = new Logger(MailService.name);
+  
+  // Resend Config
+  private readonly resendApiKey = process.env.RESEND_API_KEY;
+  private readonly resendFromEmail = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
+
+  // Brevo API Config (Pilihan B - HTTPS Port 443)
+  private readonly brevoApiKey = process.env.BREVO_API_KEY;
+  private readonly brevoSenderEmail = process.env.BREVO_SENDER_EMAIL || 'lexitkuromori@gmail.com';
+
+  // SMTP Config (Gmail/Brevo SMTP)
   private transporter: nodemailer.Transporter | null = null;
+  private readonly smtpUser = process.env.SMTP_USE || process.env.SMTP_USER;
 
   constructor() {
-    const host = process.env.SMTP_HOST;
-    const port = process.env.SMTP_PORT;
-    const user = process.env.SMTP_USER;
-    const pass = process.env.SMTP_PASS;
-
-    if (host && port && user && pass) {
-      this.transporter = nodemailer.createTransport({
-        host,
-        port: parseInt(port, 10),
-        secure: parseInt(port, 10) === 465, // true for 465, false for other ports
-        auth: { user, pass },
-      });
-      this.logger.log('SMTP Transporter configured successfully');
+    if (this.resendApiKey) {
+      this.logger.log('📧 Mail Service: Using Resend.com API (HTTPS)');
+    } else if (this.brevoApiKey) {
+      this.logger.log(`📧 Mail Service: Using Brevo.com API (HTTPS, Sender: ${this.brevoSenderEmail})`);
     } else {
-      this.logger.warn(
-        'SMTP environment variables are not fully configured. Email sending will be simulated.',
-      );
+      const host = process.env.SMTP_HOST;
+      const port = process.env.SMTP_PORT;
+      const pass = process.env.SMTP_PASS;
+
+      if (host && port && this.smtpUser && pass) {
+        this.transporter = nodemailer.createTransport({
+          host,
+          port: parseInt(port, 10),
+          secure: parseInt(port, 10) === 465,
+          auth: { user: this.smtpUser, pass },
+        });
+        this.logger.log('📧 Mail Service: Using SMTP Transporter');
+      } else {
+        this.logger.warn(
+          '📧 Mail Service: No keys found. Email sending will be simulated in console.',
+        );
+      }
     }
   }
 
@@ -46,26 +63,86 @@ export class MailService {
       </div>
     `;
 
-    // Log to console for easy local testing
-    this.logger.log(`[SIMULASI EMAIL] OTP untuk ${to}: ${otp}`);
+    this.logger.log(`[OTP SERVICE] Target: ${to} | Code: ${otp}`);
 
-    if (!this.transporter) {
-      this.logger.log('Simulated email sending successful (No SMTP configured)');
-      return true;
+    // KASUS 1: Menggunakan Resend.com API (HTTPS)
+    if (this.resendApiKey) {
+      try {
+        const response = await axios.post(
+          'https://api.resend.com/emails',
+          {
+            from: `ApotekPOS <${this.resendFromEmail}>`,
+            to,
+            subject,
+            html,
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${this.resendApiKey}`,
+              'Content-Type': 'application/json',
+            },
+          },
+        );
+        if (response.status === 200 || response.status === 201) {
+          this.logger.log(`OTP sent to ${to} via Resend.com`);
+          return true;
+        }
+        return false;
+      } catch (error: any) {
+        this.logger.error(`Resend failed: ${error.response?.data?.message || error.message}`);
+        return false;
+      }
     }
 
-    try {
-      await this.transporter.sendMail({
-        from: `"ApotekPOS" <${process.env.SMTP_USER}>`,
-        to,
-        subject,
-        html,
-      });
-      this.logger.log(`Email OTP sent successfully to ${to}`);
-      return true;
-    } catch (error) {
-      this.logger.error(`Failed to send email to ${to}: ${error.message}`);
-      return false;
+    // KASUS 2: Menggunakan Brevo API (HTTPS - Pilihan B)
+    if (this.brevoApiKey) {
+      try {
+        const response = await axios.post(
+          'https://api.brevo.com/v3/smtp/email',
+          {
+            sender: { name: 'ApotekPOS', email: this.brevoSenderEmail },
+            to: [{ email: to }],
+            subject,
+            htmlContent: html,
+          },
+          {
+            headers: {
+              'api-key': this.brevoApiKey,
+              'Content-Type': 'application/json',
+              Accept: 'application/json',
+            },
+          },
+        );
+        if (response.status === 200 || response.status === 201) {
+          this.logger.log(`OTP sent to ${to} via Brevo.com API`);
+          return true;
+        }
+        return false;
+      } catch (error: any) {
+        this.logger.error(`Brevo API failed: ${error.response?.data?.message || error.message}`);
+        return false;
+      }
     }
+
+    // KASUS 3: Menggunakan SMTP
+    if (this.transporter) {
+      try {
+        await this.transporter.sendMail({
+          from: `"ApotekPOS" <${this.smtpUser}>`,
+          to,
+          subject,
+          html,
+        });
+        this.logger.log(`OTP sent to ${to} via SMTP`);
+        return true;
+      } catch (error: any) {
+        this.logger.error(`SMTP failed: ${error.message}`);
+        return false;
+      }
+    }
+
+    // KASUS 4: Simulasi Console
+    this.logger.log(`[SIMULATION SUCCESS] OTP printed in console.`);
+    return true;
   }
 }
