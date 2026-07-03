@@ -8,14 +8,14 @@ class ApiClient {
     if (kIsWeb) {
       // Di production (Netlify), gunakan URL Render backend. Di local, gunakan localhost.
       if (kReleaseMode) {
-        return 'https://apotek-pos.onrender.com';
+        return 'https://apotek-backend.onrender.com';
       }
       return 'http://localhost:3000';
     } else {
       // Di HP Android fisik (Release Mode), gunakan URL Render backend.
       // Di Emulator (Debug Mode), gunakan 10.0.2.2 untuk mengakses localhost.
       if (kReleaseMode) {
-        return 'https://apotek-pos.onrender.com';
+        return 'https://apotek-backend.onrender.com';
       }
       return 'http://10.0.2.2:3000';
     }
