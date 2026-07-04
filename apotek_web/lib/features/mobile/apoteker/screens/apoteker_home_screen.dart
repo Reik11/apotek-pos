@@ -1,7 +1,9 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+
 import '../../../../core/api/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../features/auth/providers/auth_provider.dart';
@@ -667,9 +669,9 @@ class _PrescriptionsTabState extends State<_PrescriptionsTab> {
     
     if (weight != null && height != null) {
       // BSA using Mosteller formula: sqrt((W * H) / 3600)
-      import 'dart:math' as math;
       bsa = math.sqrt((weight * height) / 3600.0);
     }
+
 
     if (!context.mounted) return;
 
