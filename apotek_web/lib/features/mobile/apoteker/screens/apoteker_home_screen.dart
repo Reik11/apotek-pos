@@ -632,7 +632,10 @@ class _PrescriptionsTabState extends State<_PrescriptionsTab> {
     }
   }
 
-  void _showPrescribeDialog(BuildContext context, String id) async {
+  void _showPrescribeDialog(BuildContext context, Map<String, dynamic> prescription) async {
+    final id = prescription['id'];
+    final patient = prescription['patient'] ?? {};
+    
     List<dynamic> allDrugs = [];
     List<dynamic> filteredDrugs = [];
     List<Map<String, dynamic>> selectedDrugs = [];
@@ -646,6 +649,26 @@ class _PrescriptionsTabState extends State<_PrescriptionsTab> {
       isDialogLoading = false;
     } catch (e) {
       isDialogLoading = false;
+    }
+
+    // Kalkulasi Usia & BSA (Body Surface Area) jika data fisik lengkap
+    String ageText = '—';
+    double? bsa;
+    if (patient['birthDate'] != null) {
+      final birth = DateTime.tryParse(patient['birthDate']);
+      if (birth != null) {
+        final age = DateTime.now().difference(birth).inDays ~/ 365;
+        ageText = '$age tahun';
+      }
+    }
+    
+    final weight = patient['weight'] != null ? (patient['weight'] as num).toDouble() : null;
+    final height = patient['height'] != null ? (patient['height'] as num).toDouble() : null;
+    
+    if (weight != null && height != null) {
+      // BSA using Mosteller formula: sqrt((W * H) / 3600)
+      import 'dart:math' as math;
+      bsa = math.sqrt((weight * height) / 3600.0);
     }
 
     if (!context.mounted) return;
@@ -665,167 +688,240 @@ class _PrescriptionsTabState extends State<_PrescriptionsTab> {
 
           return AlertDialog(
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: const Row(
+            title: Row(
               children: [
-                Icon(Icons.medical_services, color: AppTheme.primary),
-                SizedBox(width: 8),
-                Text('Pilih Obat untuk Resep'),
+                const Icon(Icons.verified_user_outlined, color: AppTheme.success),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Verifikasi Klinis & Pembuatan Tagihan Resep', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      Text('Pasien: ${patient['name'] ?? '-'} (${patient['email'] ?? '-'})', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                    ],
+                  ),
+                ),
               ],
             ),
             content: SizedBox(
-              width: 500,
-              height: 500,
-              child: Column(
+              width: 850,
+              height: 600,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Search
-                  TextField(
-                    decoration: const InputDecoration(
-                      hintText: 'Cari obat...',
-                      prefixIcon: Icon(Icons.search),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      border: OutlineInputBorder(),
-                    ),
-                    onChanged: (val) {
-                      setDialogState(() {
-                        if (val.isEmpty) {
-                          filteredDrugs = List.from(allDrugs);
-                        } else {
-                          filteredDrugs = allDrugs
-                              .where((d) =>
-                                  d['name']
-                                      .toString()
-                                      .toLowerCase()
-                                      .contains(val.toLowerCase()) ||
-                                  (d['genericName'] != null &&
-                                      d['genericName']
-                                          .toString()
-                                          .toLowerCase()
-                                          .contains(val.toLowerCase())))
-                              .toList();
-                        }
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  
-                  // Split view
+                  // ── SEBELAH KIRI: PANEL INFORMASI MEDIS PASIEN ──
                   Expanded(
-                    child: Row(
+                    flex: 4,
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('DATA KLINIS PASIEN', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.primary, letterSpacing: 0.5)),
+                            const Divider(height: 16),
+                            
+                            _medDetailRow('Usia', ageText),
+                            _medDetailRow('Berat Badan', weight != null ? '$weight kg' : '—'),
+                            _medDetailRow('Tinggi Badan', height != null ? '$height cm' : '—'),
+                            _medDetailRow('BSA (Luas Permukaan)', bsa != null ? '${bsa.toStringAsFixed(2)} m²' : '—'),
+                            _medDetailRow('Jenis Kelamin', patient['gender'] ?? '—'),
+                            
+                            const SizedBox(height: 12),
+                            const Text('KONDISI KHUSUS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.grey)),
+                            const SizedBox(height: 4),
+                            Wrap(
+                              spacing: 8,
+                              children: [
+                                if (patient['isPregnant'] == true)
+                                  _badgeWidget('Sedang Hamil', AppTheme.danger),
+                                if (patient['isBreastfeeding'] == true)
+                                  _badgeWidget('Menyusui', Colors.orange),
+                                if (patient['isPregnant'] != true && patient['isBreastfeeding'] != true)
+                                  const Text('Tidak ada kondisi khusus', style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic)),
+                              ],
+                            ),
+                            
+                            const SizedBox(height: 12),
+                            const Text('RIWAYAT MEDIS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.grey)),
+                            const SizedBox(height: 6),
+                            _bulletDetailRow('Alergi Obat', patient['allergies']),
+                            _bulletDetailRow('Penyakit Kronis', patient['chronicDiseases']),
+                            _bulletDetailRow('Obat Rutin', patient['currentMedications']),
+                            
+                            const SizedBox(height: 12),
+                            const Text('FUNGSI ORGAN', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.grey)),
+                            const SizedBox(height: 6),
+                            _medDetailRow('Fungsi Ginjal', patient['kidneyFunction'] ?? 'Normal'),
+                            _medDetailRow('Fungsi Hati', patient['liverFunction'] ?? 'Normal'),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  
+                  // ── SEBELAH TENGAH: PENCARIAN OBAT APOTEK ──
+                  Expanded(
+                    flex: 4,
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Left: Search results
+                        const Text('PENCARIAN OBAT APOTEK', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.textPrimary)),
+                        const SizedBox(height: 8),
+                        TextField(
+                          decoration: const InputDecoration(
+                            hintText: 'Cari obat...',
+                            prefixIcon: Icon(Icons.search),
+                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            border: OutlineInputBorder(),
+                          ),
+                          onChanged: (val) {
+                            setDialogState(() {
+                              if (val.isEmpty) {
+                                filteredDrugs = List.from(allDrugs);
+                              } else {
+                                filteredDrugs = allDrugs
+                                    .where((d) =>
+                                        d['name'].toString().toLowerCase().contains(val.toLowerCase()) ||
+                                        (d['genericName'] != null && d['genericName'].toString().toLowerCase().contains(val.toLowerCase())))
+                                    .toList();
+                              }
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 8),
                         Expanded(
-                          flex: 5,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text('Hasil Cari', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                              const SizedBox(height: 4),
-                              Expanded(
-                                child: ListView.builder(
-                                  itemCount: filteredDrugs.length,
+                          child: ListView.builder(
+                            itemCount: filteredDrugs.length,
+                            itemBuilder: (c, idx) {
+                              final drug = filteredDrugs[idx];
+                              final exists = selectedDrugs.any((sd) => sd['drugId'] == drug['id']);
+                              return ListTile(
+                                title: Text(drug['name'], style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                subtitle: Text('${drug['category']} - Rp ${drug['sellPrice']}', style: const TextStyle(fontSize: 10)),
+                                trailing: exists
+                                    ? const Icon(Icons.check_circle, color: AppTheme.success, size: 18)
+                                    : const Icon(Icons.add_circle_outline, color: AppTheme.primary, size: 18),
+                                dense: true,
+                                contentPadding: EdgeInsets.zero,
+                                onTap: () {
+                                  setDialogState(() {
+                                    if (!exists) {
+                                      selectedDrugs.add({
+                                        'drugId': drug['id'],
+                                        'name': drug['name'],
+                                        'sellPrice': drug['sellPrice'],
+                                        'quantity': 1,
+                                        'notes': '', // Tempat aturan pakai / Signa
+                                      });
+                                    }
+                                  });
+                                },
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  
+                  // ── SEBELAH KANAN: DAFTAR OBAT TERPILIH & SIGNA ──
+                  Expanded(
+                    flex: 4,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('OBAT & DOSIS RESEP (SIGNA)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.success)),
+                        const SizedBox(height: 8),
+                        Expanded(
+                          child: selectedDrugs.isEmpty
+                              ? const Center(child: Text('Belum ada obat terpilih', style: TextStyle(fontSize: 12, color: Colors.grey)))
+                              : ListView.builder(
+                                  itemCount: selectedDrugs.length,
                                   itemBuilder: (c, idx) {
-                                    final drug = filteredDrugs[idx];
-                                    final exists = selectedDrugs.any((sd) => sd['drugId'] == drug['id']);
-                                    return ListTile(
-                                      title: Text(drug['name'], style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                                      subtitle: Text('${drug['category']} - Rp ${drug['sellPrice']}', style: const TextStyle(fontSize: 10)),
-                                      trailing: exists
-                                          ? const Icon(Icons.check_circle, color: AppTheme.success, size: 18)
-                                          : const Icon(Icons.add_circle_outline, color: AppTheme.primary, size: 18),
-                                      dense: true,
-                                      contentPadding: EdgeInsets.zero,
-                                      onTap: () {
-                                        setDialogState(() {
-                                          if (!exists) {
-                                            selectedDrugs.add({
-                                              'drugId': drug['id'],
-                                              'name': drug['name'],
-                                              'sellPrice': drug['sellPrice'],
-                                              'quantity': 1,
-                                            });
-                                          }
-                                        });
-                                      },
+                                    final sd = selectedDrugs[idx];
+                                    return Container(
+                                      margin: const EdgeInsets.only(bottom: 10),
+                                      padding: const EdgeInsets.all(10),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(color: Colors.grey.shade200),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Expanded(
+                                                child: Text(sd['name'], style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                              ),
+                                              IconButton(
+                                                icon: const Icon(Icons.delete_outline, size: 16, color: AppTheme.danger),
+                                                onPressed: () {
+                                                  setDialogState(() {
+                                                    selectedDrugs.removeAt(idx);
+                                                  });
+                                                },
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              const Text('Jumlah Qty:', style: TextStyle(fontSize: 11)),
+                                              Row(
+                                                children: [
+                                                  IconButton(
+                                                    icon: const Icon(Icons.remove_circle_outline, size: 16, color: AppTheme.danger),
+                                                    onPressed: () {
+                                                      setDialogState(() {
+                                                        if (sd['quantity'] > 1) sd['quantity']--;
+                                                      });
+                                                    },
+                                                  ),
+                                                  Text('${sd['quantity']}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                                  IconButton(
+                                                    icon: const Icon(Icons.add_circle_outline, size: 16, color: AppTheme.success),
+                                                    onPressed: () {
+                                                      setDialogState(() {
+                                                        sd['quantity']++;
+                                                      });
+                                                    },
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 6),
+                                          const Text('Aturan Pakai / Signa:', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey)),
+                                          const SizedBox(height: 4),
+                                          TextField(
+                                            style: const TextStyle(fontSize: 12),
+                                            decoration: const InputDecoration(
+                                              hintText: 'Contoh: 3x sehari 1 tablet setelah makan',
+                                              isDense: true,
+                                              contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                              border: OutlineInputBorder(),
+                                            ),
+                                            onChanged: (val) {
+                                              sd['notes'] = val;
+                                            },
+                                          ),
+                                        ],
+                                      ),
                                     );
                                   },
                                 ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const VerticalDivider(),
-                        
-                        // Right: Selected Items
-                        Expanded(
-                          flex: 5,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text('Obat Terpilih', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppTheme.primary)),
-                              const SizedBox(height: 4),
-                              Expanded(
-                                child: selectedDrugs.isEmpty
-                                    ? const Center(child: Text('Belum ada obat terpilih', style: TextStyle(fontSize: 10, color: Colors.grey)))
-                                    : ListView.builder(
-                                        itemCount: selectedDrugs.length,
-                                        itemBuilder: (c, idx) {
-                                          final sd = selectedDrugs[idx];
-                                          return Container(
-                                            margin: const EdgeInsets.only(bottom: 6),
-                                            padding: const EdgeInsets.all(6),
-                                            decoration: BoxDecoration(
-                                              color: Colors.grey.shade50,
-                                              borderRadius: BorderRadius.circular(8),
-                                              border: Border.all(color: Colors.grey.shade200),
-                                            ),
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Text(sd['name'], style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-                                                Row(
-                                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                                  children: [
-                                                    Text('Qty: ${sd['quantity']}', style: const TextStyle(fontSize: 10)),
-                                                    Row(
-                                                      children: [
-                                                        IconButton(
-                                                          icon: const Icon(Icons.remove_circle_outline, size: 14, color: AppTheme.danger),
-                                                          padding: EdgeInsets.zero,
-                                                          constraints: const BoxConstraints(),
-                                                          onPressed: () {
-                                                            setDialogState(() {
-                                                              if (sd['quantity'] > 1) {
-                                                                sd['quantity']--;
-                                                              } else {
-                                                                selectedDrugs.removeAt(idx);
-                                                              }
-                                                            });
-                                                          },
-                                                        ),
-                                                        const SizedBox(width: 8),
-                                                        IconButton(
-                                                          icon: const Icon(Icons.add_circle_outline, size: 14, color: AppTheme.success),
-                                                          padding: EdgeInsets.zero,
-                                                          constraints: const BoxConstraints(),
-                                                          onPressed: () {
-                                                            setDialogState(() {
-                                                              sd['quantity']++;
-                                                            });
-                                                          },
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  ],
-                                                ),
-                                              ],
-                                            ),
-                                          );
-                                        },
-                                      ),
-                              ),
-                            ],
-                          ),
                         ),
                       ],
                     ),
@@ -839,11 +935,41 @@ class _PrescriptionsTabState extends State<_PrescriptionsTab> {
                 style: ElevatedButton.styleFrom(backgroundColor: AppTheme.success),
                 onPressed: selectedDrugs.isEmpty
                     ? null
-                    : () {
+                    : () async {
                         Navigator.pop(ctx);
-                        _verifyPrescription(id, 'VERIFIED', prescribedDrugs: selectedDrugs);
+                        // Hitung konversi ke order
+                        try {
+                          await ApiClient.createDio().post(
+                            '/prescriptions/$id/convert-to-order',
+                            data: {
+                              'items': selectedDrugs.map((d) => {
+                                'drugId': d['drugId'],
+                                'quantity': d['quantity'],
+                                'notes': d['notes'],
+                              }).toList(),
+                            },
+                          );
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Resep berhasil diverifikasi & tagihan pasien terbuat!'),
+                                backgroundColor: AppTheme.success,
+                              ),
+                            );
+                          }
+                          _loadPrescriptions();
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Gagal membuat tagihan: $e'),
+                                backgroundColor: AppTheme.danger,
+                              ),
+                            );
+                          }
+                        }
                       },
-                child: const Text('Setujui & Resepkan'),
+                child: const Text('Verifikasi & Buat Tagihan'),
               ),
             ],
           );
@@ -851,6 +977,56 @@ class _PrescriptionsTabState extends State<_PrescriptionsTab> {
       ),
     );
   }
+
+  Widget _medDetailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+          Text(value, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+
+  Widget _bulletDetailRow(String label, String? value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 2),
+          Text(
+            value != null && value.isNotEmpty ? '• $value' : '• Tidak ada riwayat.',
+            style: TextStyle(
+              fontSize: 12,
+              color: value != null && value.isNotEmpty ? AppTheme.textPrimary : Colors.grey,
+              fontStyle: value != null && value.isNotEmpty ? FontStyle.normal : FontStyle.italic,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _badgeWidget(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -1029,7 +1205,7 @@ class _PrescriptionsTabState extends State<_PrescriptionsTab> {
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         ),
-                        onPressed: () => _showPrescribeDialog(context, item['id']),
+                        onPressed: () => _showPrescribeDialog(context, item),
                         icon: const Icon(Icons.check, size: 16),
                         label: const Text('Setujui', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                       ),

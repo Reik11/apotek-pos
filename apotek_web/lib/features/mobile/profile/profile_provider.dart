@@ -84,7 +84,57 @@ class ProfileNotifier extends StateNotifier<ProfileState> {
       return false;
     }
   }
+
+  // Ambil data medis pasien
+  Future<Map<String, dynamic>?> getMedicalProfile() async {
+    try {
+      final res = await _dio.get('/users/medical-profile');
+      return Map<String, dynamic>.from(res.data as Map);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // Update data medis pasien
+  Future<bool> updateMedicalProfile({
+    String? birthDate,
+    String? gender,
+    double? weight,
+    double? height,
+    String? allergies,
+    String? chronicDiseases,
+    String? currentMedications,
+    bool? isPregnant,
+    bool? isBreastfeeding,
+  }) async {
+    state = state.copyWith(isSaving: true, error: null, successMessage: null);
+    try {
+      await _dio.put('/users/medical-profile', data: {
+        'birthDate': birthDate,
+        'gender': gender,
+        'weight': weight,
+        'height': height,
+        'allergies': allergies,
+        'chronicDiseases': chronicDiseases,
+        'currentMedications': currentMedications,
+        'isPregnant': isPregnant,
+        'isBreastfeeding': isBreastfeeding,
+      });
+      state = state.copyWith(
+        isSaving: false,
+        successMessage: 'Data medis berhasil diperbarui!',
+      );
+      return true;
+    } on DioException catch (e) {
+      state = state.copyWith(
+        isSaving: false,
+        error: e.response?.data['message'] ?? 'Gagal memperbarui data medis',
+      );
+      return false;
+    }
+  }
 }
+
 
 final profileProvider =
     StateNotifierProvider<ProfileNotifier, ProfileState>((ref) {

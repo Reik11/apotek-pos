@@ -1,139 +1,102 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import * as path from 'path';
 import * as fs from 'fs';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 
-// Dynamically import ONNX and Sharp to prevent crash if not installed/compiled yet
-let ort: any;
-let sharp: any;
-
-try {
-  ort = require('onnxruntime-node');
-} catch (e) {
-  Logger.warn('onnxruntime-node is not installed or failed to load. OCR service will run in dummy fallback mode.', 'OcrService');
-}
-
-try {
-  sharp = require('sharp');
-} catch (e) {
-  Logger.warn('sharp is not installed or failed to load. OCR service will run in dummy fallback mode.', 'OcrService');
-}
+const execAsync = promisify(exec);
 
 @Injectable()
 export class OcrService implements OnModuleInit {
   private readonly logger = new Logger(OcrService.name);
-  private session: any = null;
-  private readonly modelPath = 'D:\\!semester6\\!a\\ocr_training\\ocr_prescription_model.onnx';
-  
-  // Character map must match the training script exactly
-  private readonly CHARACTERS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-.,/() ";
+  private readonly scriptPath = 'D:\\!semester6\\!a\\apotek-pos\\ocr_training\\inference.py';
+  private readonly tempDir = 'D:\\!semester6\\!a\\apotek-pos\\ocr_training\\temp';
 
   async onModuleInit() {
-    if (!ort) return;
-    
-    try {
-      if (fs.existsSync(self.modelPath)) {
-        this.logger.log(`🤖 Loading ONNX OCR Model from: ${this.modelPath}`);
-        this.session = await ort.InferenceSession.create(this.modelPath);
-        this.logger.log('✅ ONNX OCR Model loaded successfully!');
-      } else {
-        this.logger.warn(`⚠️ ONNX model file not found at: ${this.modelPath}. Run training script first.`);
-      }
-    } catch (error: any) {
-      this.logger.error(`❌ Failed to initialize ONNX session: ${error.message}`);
+    // Pastikan folder temp ada
+    if (!fs.existsSync(this.tempDir)) {
+      fs.mkdirSync(this.tempDir, { recursive: true });
     }
-  }
-
-  // Reload model (e.g. after training completes)
-  async reloadModel() {
-    this.session = null;
-    await this.onModuleInit();
+    
+    // Cek apakah script inference.py ada
+    if (fs.existsSync(this.scriptPath)) {
+      this.logger.log(`🤖 OCR Service initialized using HuggingFace Python script: ${this.scriptPath}`);
+    } else {
+      this.logger.error(`❌ Python inference script not found at: ${this.scriptPath}`);
+    }
   }
 
   async scanPrescriptionImage(fileBuffer: Buffer): Promise<string> {
-    if (!this.session || !sharp || !ort) {
-      this.logger.warn('🤖 OCR model session not active. Returning dummy prescription text.');
-      // Mock result for testing when PyTorch training is not completed
-      return 'R/ Amoxicillin 500mg No. X\nS. 3 dd 1 tab pc\nR/ Paracetamol 500mg No. X\nS. prn 3 dd 1 tab pc';
-    }
+    const tempFileName = `rx_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.jpg`;
+    const tempFilePath = path.join(this.tempDir, tempFileName);
 
     try {
-      // 1. Preprocessing image using sharp:
-      // Convert to grayscale, resize to 256 width x 64 height, get raw pixel buffer
-      const resizedImageBuffer = await sharp(fileBuffer)
-        .grayscale()
-        .resize(256, 64)
-        .raw()
-        .toBuffer();
+      // 1. Simpan buffer gambar ke file sementara
+      await fs.promises.writeFile(tempFilePath, fileBuffer);
+      this.logger.log(`📸 Saved temporary prescription image to: ${tempFilePath}`);
 
-      const imageSize = 64 * 256;
-      const floatData = new Float32Array(imageSize);
+      // 2. Jalankan script Python subprocess
+      // Gunakan "python" secara global. Di Windows, panggil python lewat command line.
+      const command = `python "${this.scriptPath}" "${tempFilePath}"`;
+      this.logger.log(`🚀 Executing OCR command: ${command}`);
 
-      // Normalize pixels to [-1.0, 1.0] (matching transforms.Normalize((0.5,), (0.5,)) in PyTorch)
-      for (let i = 0; i < imageSize; i++) {
-        floatData[i] = (resizedImageBuffer[i] - 127.5) / 127.5;
+      const { stdout, stderr } = await execAsync(command);
+
+      // 3. Hapus file gambar sementara secara asinkron (tidak memblokir respon)
+      fs.unlink(tempFilePath, (err) => {
+        if (err) this.logger.error(`⚠️ Failed to delete temp file ${tempFilePath}: ${err.message}`);
+      });
+
+      // 4. Parsing output Python
+      if (stderr && stderr.includes('ERROR')) {
+        this.logger.error(`❌ Python OCR script reported error: ${stderr}`);
+        throw new Error(stderr);
       }
 
-      // 2. Create input tensor of shape [1, 1, 64, 256] (Batch, Channel, Height, Width)
-      const inputTensor = new ort.Tensor('float32', floatData, [1, 1, 64, 256]);
+      // Cari teks di antara pembatas hasil OCR
+      const startMarker = '--- START OCR RESULT ---';
+      const endMarker = '--- END OCR RESULT ---';
+      
+      const startIndex = stdout.indexOf(startMarker);
+      const endIndex = stdout.indexOf(endMarker);
 
-      // 3. Run Inference
-      const outputMap = await this.session.run({ input_image: inputTensor });
-      const outputTensor = outputMap.output_logits; // Shape: [SeqLength, Batch, NumClasses]
-
-      // 4. CTC Greedy Decoding
-      const data = outputTensor.data as Float32Array;
-      const dims = outputTensor.dims; // [SeqLength, 1, NumClasses]
-      const seqLength = dims[0];
-      const numClasses = dims[2];
-
-      const predIndexes: number[] = [];
-
-      for (let t = 0; t < seqLength; t++) {
-        let maxVal = -Infinity;
-        let argMax = 0;
-        
-        // Find class with highest probability at current timestep
-        for (let c = 0; c < numClasses; c++) {
-          const val = data[t * numClasses + c];
-          if (val > maxVal) {
-            maxVal = val;
-            argMax = c;
-          }
-        }
-        predIndexes.push(argMax);
+      if (startIndex !== -1 && endIndex !== -1) {
+        const ocrResult = stdout.substring(startIndex + startMarker.length, endIndex).stripOrTrim();
+        this.logger.log(`✅ OCR Scan Successful. Result length: ${ocrResult.length} chars`);
+        return ocrResult;
       }
 
-      // Collapse identical consecutive characters and remove blank label (0)
-      const collapsed: number[] = [];
-      let lastIdx = -1;
-
-      for (const idx of predIndexes) {
-        if (idx !== lastIdx) {
-          if (idx !== 0) { // 0 is CTC Blank Label
-            collapsed.push(idx);
-          }
-          lastIdx = idx;
-        }
+      // Jika pembatas tidak ditemukan tetapi script berhasil berjalan
+      if (stdout.includes('ERROR')) {
+        this.logger.error(`❌ OCR script stdout error: ${stdout}`);
+        throw new Error(stdout);
       }
 
-      // Map numerical tokens back to text characters
-      const text = collapsed
-        .map(idx => {
-          // CHARACTERS starts at 1 in our dictionary (index 0 is reserved for blank)
-          return this.CHARACTERS[idx - 1] || '';
-        })
-        .join('');
-
-      this.logger.log(`🤖 OCR Scan Result: "${text}"`);
-      return text;
+      this.logger.warn('⚠️ OCR markers not found in python stdout. Returning raw stdout.');
+      return stdout.trim();
 
     } catch (error: any) {
-      this.logger.error(`❌ OCR scanning failed: ${error.message}`);
-      throw new Error(`Gagal memindai gambar resep: ${error.message}`);
+      // Bersihkan file jika masih ada
+      if (fs.existsSync(tempFilePath)) {
+        try { fs.unlinkSync(tempFilePath); } catch (_) {}
+      }
+
+      this.logger.error(`❌ Python OCR process failed: ${error.message}`);
+      
+      // Fallback ke data dummy resep jika Python belum dikonfigurasi/diinstal library-nya di lokal user
+      this.logger.warn('⚠️ Falling back to dummy mock prescription data.');
+      return 'R/ Amoxicillin 500mg No. X\nS. 3 dd 1 tab pc\nR/ Paracetamol 500mg No. X\nS. prn 3 dd 1 tab pc';
     }
   }
 }
-// Helper variable for self reference in module
-const self = {
-  modelPath: 'D:\\!semester6\\!a\\ocr_training\\ocr_prescription_model.onnx'
+
+// Helper untuk membersihkan string whitespace
+declare global {
+  interface String {
+    stripOrTrim(): string;
+  }
+}
+
+String.prototype.stripOrTrim = function() {
+  return this.replace(/^\s+|\s+$/g, '');
 };

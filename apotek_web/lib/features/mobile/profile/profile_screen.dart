@@ -26,7 +26,20 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool _obscureNew = true;
   bool _obscureConfirm = true;
 
-  String? _activeSubPage; // null (menu), 'edit_profile', 'change_password'
+  String? _activeSubPage; // null (menu), 'edit_profile', 'change_password', 'medical_profile'
+
+  // Controller Data Medis
+  final _birthDateController = TextEditingController();
+  final _weightController = TextEditingController();
+  final _heightController = TextEditingController();
+  final _allergiesController = TextEditingController();
+  final _chronicDiseasesController = TextEditingController();
+  final _currentMedicationsController = TextEditingController();
+  String? _selectedGender;
+  bool _isPregnant = false;
+  bool _isBreastfeeding = false;
+  DateTime? _selectedBirthDate;
+
 
   @override
   void initState() {
@@ -44,8 +57,39 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     _currentPassController.dispose();
     _newPassController.dispose();
     _confirmPassController.dispose();
+    
+    _birthDateController.dispose();
+    _weightController.dispose();
+    _heightController.dispose();
+    _allergiesController.dispose();
+    _chronicDiseasesController.dispose();
+    _currentMedicationsController.dispose();
     super.dispose();
   }
+
+  Future<void> _loadMedicalProfile() async {
+    final data = await ref.read(profileProvider.notifier).getMedicalProfile();
+    if (data != null && mounted) {
+      setState(() {
+        if (data['birthDate'] != null) {
+          _selectedBirthDate = DateTime.tryParse(data['birthDate']);
+          if (_selectedBirthDate != null) {
+            _birthDateController.text = "${_selectedBirthDate!.day}/${_selectedBirthDate!.month}/${_selectedBirthDate!.year}";
+          }
+        }
+        _selectedGender = data['gender'];
+        _weightController.text = data['weight']?.toString() ?? '';
+        _heightController.text = data['height']?.toString() ?? '';
+        _allergiesController.text = data['allergies'] ?? '';
+        _chronicDiseasesController.text = data['chronicDiseases'] ?? '';
+        _currentMedicationsController.text = data['currentMedications'] ?? '';
+        _isPregnant = data['isPregnant'] as bool? ?? false;
+        _isBreastfeeding = data['isBreastfeeding'] as bool? ?? false;
+      });
+    }
+  }
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -169,6 +213,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     if (user?.role == 'PASIEN') ...[
                       const SizedBox(height: 12),
                       _buildMenuItem(
+                        icon: Icons.medical_services_outlined,
+                        title: 'Informasi Medis',
+                        subtitle: 'Atur tanggal lahir, alergi, dan riwayat kesehatan',
+                        onTap: () {
+                          setState(() => _activeSubPage = 'medical_profile');
+                          _loadMedicalProfile();
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      _buildMenuItem(
                         icon: Icons.location_on_outlined,
                         title: 'Alamat Pengiriman',
                         subtitle: 'Kelola alamat tujuan pengantaran obat',
@@ -192,6 +246,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         },
                       ),
                     ],
+
                     const SizedBox(height: 20),
                     // Section Info Akun
                     _SectionCard(
@@ -532,7 +587,249 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ],
                 ),
               ),
+            ] else if (_activeSubPage == 'medical_profile') ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.arrow_back_rounded, color: AppTheme.primary),
+                          onPressed: () => setState(() => _activeSubPage = null),
+                        ),
+                        const Text(
+                          'Kembali ke Menu',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    _SectionCard(
+                      title: 'Informasi Medis',
+                      icon: Icons.medical_services_outlined,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (profileState.successMessage != null)
+                            _MessageBanner(
+                              message: profileState.successMessage!,
+                              isSuccess: true,
+                            ),
+                          if (profileState.error != null)
+                            _MessageBanner(
+                              message: profileState.error!,
+                              isSuccess: false,
+                            ),
+                          
+                          // Tanggal Lahir (DatePicker)
+                          const Text('Tanggal Lahir', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                          const SizedBox(height: 6),
+                          InkWell(
+                            onTap: () async {
+                              final picked = await showDatePicker(
+                                context: context,
+                                initialDate: _selectedBirthDate ?? DateTime(2000),
+                                firstDate: DateTime(1920),
+                                lastDate: DateTime.now(),
+                              );
+                              if (picked != null) {
+                                setState(() {
+                                  _selectedBirthDate = picked;
+                                  _birthDateController.text = "${picked.day}/${picked.month}/${picked.year}";
+                                });
+                              }
+                            },
+                            child: IgnorePointer(
+                              child: _InputField(
+                                controller: _birthDateController,
+                                label: 'Pilih Tanggal Lahir',
+                                icon: Icons.calendar_month_outlined,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Jenis Kelamin (Dropdown)
+                          const Text('Jenis Kelamin', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                          const SizedBox(height: 6),
+                          DropdownButtonFormField<String>(
+                            value: _selectedGender,
+                            decoration: InputDecoration(
+                              prefixIcon: const Icon(Icons.wc_outlined, size: 20),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                            ),
+                            items: const [
+                              DropdownMenuItem(value: 'Laki-laki', child: Text('Laki-laki')),
+                              DropdownMenuItem(value: 'Perempuan', child: Text('Perempuan')),
+                            ],
+                            onChanged: (val) {
+                              setState(() {
+                                _selectedGender = val;
+                              });
+                            },
+                            hint: const Text('Pilih Jenis Kelamin'),
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Berat & Tinggi Badan (Row)
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text('Berat Badan (kg)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                    const SizedBox(height: 6),
+                                    _InputField(
+                                      controller: _weightController,
+                                      label: 'Contoh: 65',
+                                      icon: Icons.monitor_weight_outlined,
+                                      keyboardType: TextInputType.number,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text('Tinggi Badan (cm)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                    const SizedBox(height: 6),
+                                    _InputField(
+                                      controller: _heightController,
+                                      label: 'Contoh: 170',
+                                      icon: Icons.height_outlined,
+                                      keyboardType: TextInputType.number,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Alergi Obat
+                          const Text('Riwayat Alergi Obat', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                          const SizedBox(height: 6),
+                          _InputField(
+                            controller: _allergiesController,
+                            label: 'Contoh: Alergi penisilin (kosongkan jika tidak ada)',
+                            icon: Icons.warning_amber_outlined,
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Penyakit Kronis
+                          const Text('Penyakit Kronis', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                          const SizedBox(height: 6),
+                          _InputField(
+                            controller: _chronicDiseasesController,
+                            label: 'Contoh: Asma, Hipertensi (kosongkan jika tidak ada)',
+                            icon: Icons.healing_outlined,
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Obat Rutin
+                          const Text('Obat Rutin Saat Ini', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                          const SizedBox(height: 6),
+                          _InputField(
+                            controller: _currentMedicationsController,
+                            label: 'Contoh: Amlodipin (kosongkan jika tidak ada)',
+                            icon: Icons.medication_outlined,
+                          ),
+                          const SizedBox(height: 20),
+
+                          // Kondisi Khusus (Khusus Perempuan)
+                          if (_selectedGender == 'Perempuan') ...[
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.grey.shade50,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: Colors.grey.shade200),
+                              ),
+                              child: Column(
+                                children: [
+                                  SwitchListTile(
+                                    title: const Text('Sedang Hamil', style: TextStyle(fontSize: 14)),
+                                    value: _isPregnant,
+                                    activeColor: AppTheme.primary,
+                                    contentPadding: EdgeInsets.zero,
+                                    onChanged: (val) => setState(() => _isPregnant = val),
+                                  ),
+                                  const Divider(height: 1),
+                                  SwitchListTile(
+                                    title: const Text('Sedang Menyusui', style: TextStyle(fontSize: 14)),
+                                    value: _isBreastfeeding,
+                                    activeColor: AppTheme.primary,
+                                    contentPadding: EdgeInsets.zero,
+                                    onChanged: (val) => setState(() => _isBreastfeeding = val),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                          ],
+
+                          // Tombol Simpan
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: profileState.isSaving
+                                  ? null
+                                  : () async {
+                                      final success = await ref
+                                          .read(profileProvider.notifier)
+                                          .updateMedicalProfile(
+                                            birthDate: _selectedBirthDate?.toIso8601String(),
+                                            gender: _selectedGender,
+                                            weight: double.tryParse(_weightController.text),
+                                            height: double.tryParse(_heightController.text),
+                                            allergies: _allergiesController.text.trim(),
+                                            chronicDiseases: _chronicDiseasesController.text.trim(),
+                                            currentMedications: _currentMedicationsController.text.trim(),
+                                            isPregnant: _isPregnant,
+                                            isBreastfeeding: _isBreastfeeding,
+                                          );
+                                      if (success && mounted) {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          const SnackBar(
+                                            content: Text('Informasi medis berhasil disimpan!'),
+                                            backgroundColor: AppTheme.success,
+                                          ),
+                                        );
+                                      }
+                                    },
+                              icon: profileState.isSaving
+                                  ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : const Icon(Icons.save_outlined),
+                              label: const Text('Simpan Data Medis'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                  ],
+                ),
+              ),
             ]
+
           ],
         ),
       ),
