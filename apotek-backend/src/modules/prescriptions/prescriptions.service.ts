@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -16,7 +16,25 @@ export class PrescriptionsService {
     return this.prisma.prescription.findMany({
       where: status ? { status: status as any } : undefined,
       include: {
-        patient: { select: { id: true, name: true, email: true } },
+        patient: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            birthDate: true,
+            gender: true,
+            weight: true,
+            height: true,
+            allergies: true,
+            chronicDiseases: true,
+            currentMedications: true,
+            isPregnant: true,
+            isBreastfeeding: true,
+            kidneyFunction: true,
+            liverFunction: true,
+            medicalProfileUpdatedAt: true,
+          },
+        },
         orders: { select: { id: true, orderCode: true, status: true } },
       },
       orderBy: { createdAt: 'desc' },
@@ -44,6 +62,82 @@ export class PrescriptionsService {
         verifiedAt: new Date(),
         prescribedDrugs: prescribedDrugs || undefined,
       },
+    });
+  }
+
+  /**
+   * Konversi resep yang sudah diverifikasi apoteker menjadi Order+OrderItem baru
+   * sekaligus menyimpan aturan pakai (Signa) per obat.
+   */
+  async convertToOrder(
+    prescriptionId: string,
+    apotekerId: string,
+    items: { drugId: string; quantity: number; notes?: string }[],
+  ) {
+    // 1. Ambil & validasi resep
+    const prescription = await this.prisma.prescription.findUnique({
+      where: { id: prescriptionId },
+    });
+    if (!prescription) throw new NotFoundException('Resep tidak ditemukan');
+    if (prescription.status !== 'PENDING') {
+      throw new BadRequestException('Resep ini sudah pernah diproses');
+    }
+
+    // 2. Hitung total harga dan siapkan data item
+    let totalAmount = 0;
+    const orderItemsData: any[] = [];
+
+    for (const item of items) {
+      const drug = await this.prisma.drug.findUnique({ where: { id: item.drugId } });
+      if (!drug) throw new NotFoundException(`Obat dengan ID ${item.drugId} tidak ditemukan`);
+
+      const subtotal = drug.sellPrice * item.quantity;
+      totalAmount += subtotal;
+
+      orderItemsData.push({
+        drugId: item.drugId,
+        quantity: item.quantity,
+        price: drug.sellPrice,
+        subtotal,
+        notes: item.notes ?? null, // Aturan pakai (Signa) dari apoteker
+      });
+    }
+
+    const orderCode = `APT-${Date.now()}-${Math.random()
+      .toString(36)
+      .substring(2, 6)
+      .toUpperCase()}`;
+
+    // 3. Jalankan dalam satu Prisma transaction agar atomik
+    return this.prisma.$transaction(async (tx) => {
+      // A. Update status resep menjadi VERIFIED
+      await tx.prescription.update({
+        where: { id: prescriptionId },
+        data: {
+          status: 'VERIFIED',
+          verifiedBy: apotekerId,
+          verifiedAt: new Date(),
+        },
+      });
+
+      // B. Buat Order baru bertipe PICKUP (obat resep harus diambil langsung)
+      return tx.order.create({
+        data: {
+          patientId: prescription.patientId,
+          prescriptionId,
+          totalAmount,
+          orderCode,
+          deliveryMethod: 'PICKUP',
+          paymentMethod: 'TRANSFER',
+          items: {
+            create: orderItemsData,
+          },
+        },
+        include: {
+          items: { include: { drug: true } },
+          prescription: { select: { id: true, imageUrl: true, notes: true } },
+        },
+      });
     });
   }
 }

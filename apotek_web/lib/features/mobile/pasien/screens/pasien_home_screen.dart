@@ -197,15 +197,382 @@ class _PasienHomeScreenState extends ConsumerState<PasienHomeScreen> {
           (item['drug']['sellPrice'] as num).toDouble() *
               (item['quantity'] as int));
 
+  // ─── Tampilkan popup konfirmasi data diri sebelum checkout ───
   void _checkout() {
     if (cartItems.isEmpty) return;
+    _showMedicalConfirmationDialog();
+  }
 
+  Future<void> _showMedicalConfirmationDialog() async {
+    // Load data medis pasien saat ini dari backend
+    Map<String, dynamic>? medicalData;
+    try {
+      final res = await ApiClient.createDio().get('/users/medical-profile');
+      medicalData = Map<String, dynamic>.from(res.data as Map);
+    } catch (_) {
+      medicalData = {};
+    }
+
+    // State lokal popup
+    final weightCtrl = TextEditingController(
+      text: medicalData?['weight']?.toString() ?? '',
+    );
+    final heightCtrl = TextEditingController(
+      text: medicalData?['height']?.toString() ?? '',
+    );
+    bool isPregnant     = medicalData?['isPregnant'] as bool? ?? false;
+    bool isBreastfeeding = medicalData?['isBreastfeeding'] as bool? ?? false;
+    bool hasNewMed      = false;
+    bool hasNewAllergy  = false;
+
+    // Kalkulasi usia otomatis dari birthDate
+    String ageText = '—';
+    if (medicalData?['birthDate'] != null) {
+      final birth = DateTime.tryParse(medicalData!['birthDate']);
+      if (birth != null) {
+        final age = DateTime.now().difference(birth).inDays ~/ 365;
+        ageText = '$age tahun';
+      }
+    }
+    final birthText = medicalData?['birthDate'] != null
+        ? _formatDate(medicalData!['birthDate'])
+        : '—';
+
+    if (!mounted) return;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => Dialog(
+          backgroundColor: const Color(0xFF1C1C1E),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          child: Container(
+            width: 420,
+            padding: const EdgeInsets.all(24),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // ── Header ──
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primary.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.person_outlined, color: AppTheme.primary, size: 22),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Konfirmasi data diri',
+                              style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold),
+                            ),
+                            Text(
+                              'Pastikan data berikut masih sesuai kondisimu saat ini.',
+                              style: TextStyle(color: Color(0xFF8E8E93), fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+
+                  // ── DATA FISIK ──
+                  const Text('DATA FISIK', style: TextStyle(color: Color(0xFF8E8E93), fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.8)),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      // Usia (otomatis, readonly)
+                      Expanded(
+                        child: _medInfoTile(
+                          label: 'Usia',
+                          value: ageText,
+                          sub: 'Lahir $birthText',
+                          badge: 'Otomatis',
+                          badgeColor: AppTheme.success,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      // Tanggal lahir (readonly)
+                      Expanded(
+                        child: _medInfoTile(
+                          label: 'Tanggal lahir',
+                          value: birthText,
+                          sub: 'Hubungi apotek jika salah',
+                          badge: '🔒 Tetap',
+                          badgeColor: const Color(0xFF48484A),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      // Berat badan (editable)
+                      Expanded(
+                        child: _medEditTile(
+                          label: 'Berat badan',
+                          suffix: 'kg',
+                          controller: weightCtrl,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      // Tinggi badan (editable)
+                      Expanded(
+                        child: _medEditTile(
+                          label: 'Tinggi badan',
+                          suffix: 'cm',
+                          controller: heightCtrl,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+
+                  // ── KONDISI SAAT INI ──
+                  const Text('KONDISI SAAT INI', style: TextStyle(color: Color(0xFF8E8E93), fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.8)),
+                  const SizedBox(height: 10),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2C2C2E),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      children: [
+                        _conditionToggle(
+                          label: 'Sedang hamil',
+                          icon: null,
+                          value: isPregnant,
+                          onChanged: (v) => setDialogState(() => isPregnant = v),
+                          isLast: false,
+                        ),
+                        _conditionToggle(
+                          label: 'Sedang menyusui',
+                          icon: Icons.child_friendly_outlined,
+                          value: isBreastfeeding,
+                          onChanged: (v) => setDialogState(() => isBreastfeeding = v),
+                          isLast: false,
+                        ),
+                        _conditionToggle(
+                          label: 'Ada obat rutin baru',
+                          icon: Icons.medication_outlined,
+                          value: hasNewMed,
+                          onChanged: (v) => setDialogState(() => hasNewMed = v),
+                          isLast: false,
+                        ),
+                        _conditionToggle(
+                          label: 'Ada alergi baru',
+                          icon: Icons.warning_amber_outlined,
+                          value: hasNewAllergy,
+                          onChanged: (v) => setDialogState(() => hasNewAllergy = v),
+                          isLast: true,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // ── Catatan privasi ──
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      Icon(Icons.lock_outline, color: Color(0xFF8E8E93), size: 13),
+                      SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Data hanya digunakan untuk validasi dosis dan keamanan obat oleh apoteker.',
+                          style: TextStyle(color: Color(0xFF8E8E93), fontSize: 11),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+
+                  // ── Tombol aksi ──
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Color(0xFF48484A)),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 13),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          icon: const Icon(Icons.arrow_forward, size: 16),
+                          label: const Text('Lewati'),
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            _showPaymentDialog();
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.primary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 13),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          icon: const Icon(Icons.arrow_forward, size: 16),
+                          label: const Text('Data sudah benar'),
+                          onPressed: () async {
+                            // Simpan data yang diubah ke backend
+                            try {
+                              await ApiClient.createDio().put('/users/medical-profile', data: {
+                                'weight': double.tryParse(weightCtrl.text),
+                                'height': double.tryParse(heightCtrl.text),
+                                'isPregnant': isPregnant,
+                                'isBreastfeeding': isBreastfeeding,
+                              });
+                            } catch (_) {}
+                            if (ctx.mounted) Navigator.pop(ctx);
+                            _showPaymentDialog();
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _formatDate(String? isoDate) {
+    if (isoDate == null) return '—';
+    final d = DateTime.tryParse(isoDate);
+    if (d == null) return '—';
+    const months = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Ags','Sep','Okt','Nov','Des'];
+    return '${d.day} ${months[d.month - 1]} ${d.year}';
+  }
+
+  Widget _medInfoTile({
+    required String label,
+    required String value,
+    required String sub,
+    required String badge,
+    required Color badgeColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF2C2C2E),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(label, style: const TextStyle(color: Color(0xFF8E8E93), fontSize: 11)),
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(color: badgeColor.withOpacity(0.15), borderRadius: BorderRadius.circular(4)),
+                child: Text(badge, style: TextStyle(color: badgeColor, fontSize: 9, fontWeight: FontWeight.w600)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(value, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+          Text(sub, style: const TextStyle(color: Color(0xFF8E8E93), fontSize: 10)),
+        ],
+      ),
+    );
+  }
+
+  Widget _medEditTile({required String label, required String suffix, required TextEditingController controller}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF2C2C2E),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: const TextStyle(color: Color(0xFF8E8E93), fontSize: 11)),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: controller,
+                  keyboardType: TextInputType.number,
+                  style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                  decoration: const InputDecoration(
+                    border: InputBorder.none,
+                    isDense: true,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+              ),
+              Text(suffix, style: const TextStyle(color: Color(0xFF8E8E93), fontSize: 12)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _conditionToggle({
+    required String label,
+    required IconData? icon,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+    required bool isLast,
+  }) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              if (icon != null) ...[
+                Icon(icon, color: const Color(0xFF8E8E93), size: 18),
+                const SizedBox(width: 10),
+              ] else
+                const SizedBox(width: 28),
+              Expanded(
+                child: Text(label, style: const TextStyle(color: Colors.white, fontSize: 14)),
+              ),
+              Switch(
+                value: value,
+                onChanged: onChanged,
+                activeColor: AppTheme.primary,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ],
+          ),
+        ),
+        if (!isLast)
+          const Divider(height: 1, color: Color(0xFF3A3A3C), indent: 14, endIndent: 14),
+      ],
+    );
+  }
+
+  // ─── Modal pembayaran (dipanggil setelah konfirmasi data diri) ───
+  void _showPaymentDialog() {
     if (_paymentMethod == 'CASH') {
       _processCheckout(null);
       return;
     }
 
-    // Tampilkan modal bayar
     showDialog(
       context: context,
       builder: (ctx) {
@@ -226,7 +593,6 @@ class _PasienHomeScreenState extends ConsumerState<PasienHomeScreen> {
                     style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppTheme.primary),
                   ),
                   const SizedBox(height: 16),
-                  
                   if (_paymentMethod == 'TRANSFER') ...[
                     const Text('Silakan transfer ke rekening berikut:', style: TextStyle(fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
@@ -266,7 +632,6 @@ class _PasienHomeScreenState extends ConsumerState<PasienHomeScreen> {
                       ),
                     ),
                   ],
-                  
                   const SizedBox(height: 16),
                   const Text('Bukti Pembayaran:', style: TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
@@ -303,9 +668,7 @@ class _PasienHomeScreenState extends ConsumerState<PasienHomeScreen> {
                           IconButton(
                             icon: const Icon(Icons.close, color: Colors.grey, size: 18),
                             onPressed: () {
-                              setDialogState(() {
-                                mockProofUrl = null;
-                              });
+                              setDialogState(() { mockProofUrl = null; });
                             },
                           ),
                         ],
@@ -331,6 +694,7 @@ class _PasienHomeScreenState extends ConsumerState<PasienHomeScreen> {
       },
     );
   }
+
 
   Future<void> _processCheckout(String? paymentProof) async {
     try {

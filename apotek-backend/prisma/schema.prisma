@@ -26,6 +26,22 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  // ==================
+  // DATA MEDIS PASIEN
+  // ==================
+  birthDate           DateTime? // Untuk kalkulasi usia otomatis
+  gender              String?   // "Laki-laki" / "Perempuan"
+  weight              Float?    // Berat badan dalam kg
+  height              Float?    // Tinggi badan dalam cm
+  allergies           String?   // Riwayat alergi obat (teks bebas)
+  chronicDiseases     String?   // Penyakit kronis (cth: "Asma ringan")
+  currentMedications  String?   // Obat rutin saat ini (cth: "Salbutamol inhaler")
+  isPregnant          Boolean   @default(false)
+  isBreastfeeding     Boolean   @default(false)
+  kidneyFunction      String?   @default("Normal") // "Normal" / "Ringan" / "Sedang" / "Berat"
+  liverFunction       String?   @default("Normal") // "Normal" / "Gangguan"
+  medicalProfileUpdatedAt DateTime? // Waktu terakhir data medis diupdate
+
   transactions  Transaction[]
   orders        Order[]
   ocrScans      OcrScan[]
@@ -34,6 +50,7 @@ model User {
   reports       UserReport[]
   shifts        CashShift[]
 }
+
 
 enum Role {
   SUPER_ADMIN
@@ -238,6 +255,7 @@ model OrderItem {
   quantity Int
   price    Float
   subtotal Float
+  notes    String? // Aturan pakai (Signa) - contoh: "3x sehari 1 tablet sesudah makan"
 }
 
 // ==================

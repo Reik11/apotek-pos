@@ -58,6 +58,28 @@ export class UsersController {
     return this.usersService.updateProfile(req.user.id, body.name, body.email);
   }
 
+  @Get('medical-profile')
+  getMedicalProfile(@Request() req: any) {
+    return this.usersService.getMedicalProfile(req.user.id);
+  }
+
+  @Put('medical-profile')
+  updateMedicalProfile(@Request() req: any, @Body() body: any) {
+    return this.usersService.updateMedicalProfile(req.user.id, {
+      birthDate: body.birthDate,
+      gender: body.gender,
+      weight: body.weight,
+      height: body.height,
+      allergies: body.allergies,
+      chronicDiseases: body.chronicDiseases,
+      currentMedications: body.currentMedications,
+      isPregnant: body.isPregnant,
+      isBreastfeeding: body.isBreastfeeding,
+      kidneyFunction: body.kidneyFunction,
+      liverFunction: body.liverFunction,
+    });
+  }
+
   @Put('change-password')
   changePassword(@Request() req: any, @Body() body: any) {
     return this.usersService.changePassword(

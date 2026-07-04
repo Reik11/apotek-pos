@@ -19,7 +19,7 @@ export class PrescriptionsController {
     });
   }
 
-  // Apoteker lihat semua resep
+  // Apoteker lihat semua resep (termasuk data medis pasien)
   @Get()
   findAll(@Query('status') status?: string) {
     return this.prescriptionsService.findAll(status);
@@ -31,7 +31,7 @@ export class PrescriptionsController {
     return this.prescriptionsService.findByPatient(req.user.id);
   }
 
-  // Apoteker verifikasi/tolak resep
+  // Apoteker verifikasi/tolak resep (cara lama — tanpa membuat order)
   @Patch(':id/verify')
   verify(
     @Param('id') id: string,
@@ -39,5 +39,15 @@ export class PrescriptionsController {
     @Body() body: { status: 'VERIFIED' | 'REJECTED'; prescribedDrugs?: any },
   ) {
     return this.prescriptionsService.verify(id, req.user.id, body.status, body.prescribedDrugs);
+  }
+
+  // Apoteker verifikasi resep & otomatis buat tagihan Order untuk pasien
+  @Post(':id/convert-to-order')
+  convertToOrder(
+    @Param('id') id: string,
+    @Request() req: any,
+    @Body() body: { items: { drugId: string; quantity: number; notes?: string }[] },
+  ) {
+    return this.prescriptionsService.convertToOrder(id, req.user.id, body.items);
   }
 }

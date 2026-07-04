@@ -26,6 +26,69 @@ export class UsersService {
     });
   }
 
+  async getMedicalProfile(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        name: true,
+        birthDate: true,
+        gender: true,
+        weight: true,
+        height: true,
+        allergies: true,
+        chronicDiseases: true,
+        currentMedications: true,
+        isPregnant: true,
+        isBreastfeeding: true,
+        kidneyFunction: true,
+        liverFunction: true,
+        medicalProfileUpdatedAt: true,
+      },
+    });
+    if (!user) throw new NotFoundException('User tidak ditemukan');
+    return user;
+  }
+
+  async updateMedicalProfile(userId: string, data: {
+    birthDate?: string;
+    gender?: string;
+    weight?: number;
+    height?: number;
+    allergies?: string;
+    chronicDiseases?: string;
+    currentMedications?: string;
+    isPregnant?: boolean;
+    isBreastfeeding?: boolean;
+    kidneyFunction?: string;
+    liverFunction?: string;
+  }) {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...data,
+        birthDate: data.birthDate ? new Date(data.birthDate) : undefined,
+        medicalProfileUpdatedAt: new Date(),
+      },
+      select: {
+        id: true,
+        name: true,
+        birthDate: true,
+        gender: true,
+        weight: true,
+        height: true,
+        allergies: true,
+        chronicDiseases: true,
+        currentMedications: true,
+        isPregnant: true,
+        isBreastfeeding: true,
+        kidneyFunction: true,
+        liverFunction: true,
+        medicalProfileUpdatedAt: true,
+      },
+    });
+  }
+
   async changePassword(
     userId: string,
     email: string,
