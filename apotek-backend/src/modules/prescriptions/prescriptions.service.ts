@@ -12,6 +12,39 @@ export class PrescriptionsService {
     });
   }
 
+  async createWithFile(patientId: string, file: any, notes?: string) {
+    if (!file) throw new BadRequestException('File gambar resep tidak boleh kosong.');
+    
+    // Pastikan folder upload ada
+    const path = require('path');
+    const fs = require('fs');
+    const uploadsDir = path.join(__dirname, '..', '..', '..', 'uploads', 'prescriptions');
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+
+    const fileExt = path.extname(file.originalname) || '.jpg';
+    const filename = `rx_${Date.now()}_${Math.random().toString(36).substring(2, 7)}${fileExt}`;
+    const filePath = path.join(uploadsDir, filename);
+
+    // Tulis file secara sinkron
+    fs.writeFileSync(filePath, file.buffer);
+
+    // Base URL dinamis
+    const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
+    const imageUrl = `${baseUrl}/uploads/prescriptions/${filename}`;
+
+    return this.prisma.prescription.create({
+      data: {
+        patientId,
+        imageUrl,
+        notes: notes || null,
+      },
+      include: { patient: { select: { id: true, name: true, email: true } } },
+    });
+  }
+
+
   async findAll(status?: string) {
     return this.prisma.prescription.findMany({
       where: status ? { status: status as any } : undefined,

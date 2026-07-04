@@ -28,7 +28,7 @@ export class AuthService {
     expiresAt.setMinutes(expiresAt.getMinutes() + 5);
 
     this.otps.set(`forgot:${email}`, { code, expiresAt });
-    const sent = await this.mailService.sendOtpEmail(email, code);
+    const sent = await this.mailService.sendOtpEmail(email, code, 'forgot');
     if (!sent) {
       throw new BadRequestException('Gagal mengirim email OTP. Periksa konfigurasi email server.');
     }
@@ -65,7 +65,7 @@ export class AuthService {
 
     this.otps.set(`register:${email}`, { code, expiresAt });
     
-    const sent = await this.mailService.sendOtpEmail(email, code);
+    const sent = await this.mailService.sendOtpEmail(email, code, 'register');
     if (!sent) {
       throw new BadRequestException('Gagal mengirim email OTP. Silakan hubungi admin atau periksa konfigurasi server.');
     }
@@ -81,12 +81,13 @@ export class AuthService {
     expiresAt.setMinutes(expiresAt.getMinutes() + 5);
 
     this.otps.set(`change-password:${email}`, { code, expiresAt });
-    const sent = await this.mailService.sendOtpEmail(email, code);
+    const sent = await this.mailService.sendOtpEmail(email, code, 'change');
     if (!sent) {
       throw new BadRequestException('Gagal mengirim email OTP. Periksa konfigurasi email server.');
     }
     return true;
   }
+
 
   async verifyChangePasswordOtp(email: string, otp: string): Promise<void> {
     const key = `change-password:${email}`;

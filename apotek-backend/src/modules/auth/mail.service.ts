@@ -44,26 +44,40 @@ export class MailService {
     }
   }
 
-  async sendOtpEmail(to: string, otp: string): Promise<boolean> {
-    const subject = 'Kode OTP Lupa Password - ApotekPOS';
+  async sendOtpEmail(to: string, otp: string, type: 'register' | 'forgot' | 'change' = 'forgot'): Promise<boolean> {
+    let subject = 'Verifikasi OTP - ApotekPOS';
+    let messageText = 'Gunakan kode OTP di bawah ini untuk memverifikasi akun Anda:';
+
+    if (type === 'register') {
+      subject = 'Verifikasi Pendaftaran Akun - ApotekPOS';
+      messageText = 'Terima kasih telah mendaftar di ApotekPOS. Gunakan kode OTP di bawah ini untuk menyelesaikan pendaftaran akun Anda:';
+    } else if (type === 'forgot') {
+      subject = 'Kode OTP Lupa Password - ApotekPOS';
+      messageText = 'Kami menerima permintaan untuk mereset kata sandi akun ApotekPOS Anda. Gunakan kode OTP di bawah ini untuk memverifikasi identitas Anda:';
+    } else if (type === 'change') {
+      subject = 'Verifikasi Perubahan Password - ApotekPOS';
+      messageText = 'Kami menerima permintaan untuk mengubah kata sandi akun ApotekPOS Anda. Gunakan kode OTP di bawah ini untuk mengonfirmasi perubahan:';
+    }
+
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
         <h2 style="color: #0d5c4a; text-align: center;">ApotekPOS</h2>
         <hr style="border: 0; border-top: 1px solid #e2e8f0;" />
         <p>Halo,</p>
-        <p>Kami menerima permintaan untuk mereset kata sandi akun ApotekPOS Anda. Gunakan kode OTP di bawah ini untuk memverifikasi identitas Anda:</p>
+        <p>${messageText}</p>
         <div style="text-align: center; margin: 30px 0;">
           <span style="font-size: 32px; font-weight: bold; letter-spacing: 4px; color: #0d5c4a; background-color: #f1f5f9; padding: 12px 24px; border-radius: 8px; border: 1px dashed #cbd5e1;">
             ${otp}
           </span>
         </div>
-        <p style="color: #64748b; font-size: 13px;">Kode OTP ini berlaku selama <strong>5 menit</strong>. Jika Anda tidak merasa meminta reset kata sandi, abaikan email ini.</p>
+        <p style="color: #64748b; font-size: 13px;">Kode OTP ini berlaku selama <strong>5 menit</strong>. Jika Anda tidak merasa melakukan permintaan ini, abaikan email ini.</p>
         <hr style="border: 0; border-top: 1px solid #e2e8f0; margin-top: 30px;" />
         <p style="color: #94a3b8; font-size: 11px; text-align: center;">&copy; ${new Date().getFullYear()} ApotekPOS. Hak Cipta Dilindungi.</p>
       </div>
     `;
 
-    this.logger.log(`[OTP SERVICE] Target: ${to} | Code: ${otp}`);
+    this.logger.log(`[OTP SERVICE] Target: ${to} | Code: ${otp} | Type: ${type}`);
+
 
     // KASUS 1: Menggunakan Resend.com API (HTTPS)
     if (this.resendApiKey) {

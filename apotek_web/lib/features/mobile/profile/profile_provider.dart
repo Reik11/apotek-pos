@@ -60,16 +60,37 @@ class ProfileNotifier extends StateNotifier<ProfileState> {
     }
   }
 
-  // Ganti password
+  // Minta OTP Ganti Password
+  Future<bool> requestChangePasswordOtp() async {
+    state = state.copyWith(isSaving: true, error: null, successMessage: null);
+    try {
+      await _dio.post('/auth/change-password/request-otp');
+      state = state.copyWith(
+        isSaving: false,
+        successMessage: 'Kode OTP ganti password telah dikirim ke email Anda.',
+      );
+      return true;
+    } on DioException catch (e) {
+      state = state.copyWith(
+        isSaving: false,
+        error: e.response?.data['message'] ?? 'Gagal mengirim OTP ganti password',
+      );
+      return false;
+    }
+  }
+
+  // Ganti password dengan verifikasi OTP
   Future<bool> changePassword({
     required String currentPassword,
     required String newPassword,
+    required String otp,
   }) async {
     state = state.copyWith(isSaving: true, error: null, successMessage: null);
     try {
       await _dio.put('/users/change-password', data: {
         'currentPassword': currentPassword,
         'newPassword': newPassword,
+        'otp': otp,
       });
       state = state.copyWith(
         isSaving: false,
@@ -84,6 +105,7 @@ class ProfileNotifier extends StateNotifier<ProfileState> {
       return false;
     }
   }
+
 
   // Ambil data medis pasien
   Future<Map<String, dynamic>?> getMedicalProfile() async {

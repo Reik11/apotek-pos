@@ -1,10 +1,14 @@
 import 'dart:io';
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:dio/dio.dart' as dio;
 import '../../../../core/api/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
+
 
 class PrescriptionScreen extends ConsumerStatefulWidget {
   final Function(Map<String, dynamic>)? onRedeemPrescription;
@@ -26,7 +30,10 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
   bool isLoading = true;
   bool isUploading = false;
   File? _selectedImage;
+  Uint8List? _webImageBytes;
+  String? _webImageName;
   bool _useCustomUrl = false;
+
 
   @override
   void initState() {
@@ -72,9 +79,19 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
 
       if (pickedFile == null) return;
 
-      setState(() {
-        _selectedImage = File(pickedFile.path);
-      });
+      if (kIsWeb) {
+        final bytes = await pickedFile.readAsBytes();
+        setState(() {
+          _webImageBytes = bytes;
+          _webImageName = pickedFile.name;
+          _selectedImage = File(pickedFile.path); // path placeholder
+        });
+      } else {
+        setState(() {
+          _selectedImage = File(pickedFile.path);
+          _webImageBytes = null;
+        });
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -85,7 +102,8 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
   }
 
   Future<void> _submitPrescription() async {
-    if (_selectedImage == null && (!_useCustomUrl || _customUrlController.text.trim().isEmpty)) {
+    final hasImage = _selectedImage != null || _webImageBytes != null;
+    if (!hasImage && (!_useCustomUrl || _customUrlController.text.trim().isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Silakan pilih gambar resep atau gunakan URL kustom'),
@@ -98,18 +116,42 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
     setState(() => isUploading = true);
 
     try {
-      // Simulasi upload gambar ke storage (2 detik)
-      await Future.delayed(const Duration(seconds: 2));
+      final dioClient = ApiClient.createDio();
 
-      // Jika menggunakan link kustom, pakai input user, jika tidak gunakan mock prescription URL
-      final imageUrl = _useCustomUrl && _customUrlController.text.trim().isNotEmpty
-          ? _customUrlController.text.trim()
-          : 'https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop&w=800&q=80';
+      if (_useCustomUrl && _customUrlController.text.trim().isNotEmpty) {
+        // Link kustom
+        await dioClient.post('/prescriptions', data: {
+          'imageUrl': _customUrlController.text.trim(),
+          'notes': _notesController.text.trim().isNotEmpty ? _notesController.text.trim() : null,
+        });
+      } else {
+        // Unggah file aslinya ke API backend via Multipart Form Data
+        final dio.FormData formData = dio.FormData();
+        
+        if (_notesController.text.trim().isNotEmpty) {
+          formData.fields.add(MapEntry('notes', _notesController.text.trim()));
+        }
 
-      await ApiClient.createDio().post('/prescriptions', data: {
-        'imageUrl': imageUrl,
-        'notes': _notesController.text.trim().isNotEmpty ? _notesController.text.trim() : null,
-      });
+        if (kIsWeb && _webImageBytes != null) {
+          formData.files.add(MapEntry(
+            'file',
+            dio.MultipartFile.fromBytes(
+              _webImageBytes!,
+              filename: _webImageName ?? 'prescription.jpg',
+            ),
+          ));
+        } else if (_selectedImage != null) {
+          formData.files.add(MapEntry(
+            'file',
+            await dio.MultipartFile.fromFile(
+              _selectedImage!.path,
+              filename: 'prescription.jpg',
+            ),
+          ));
+        }
+
+        await dioClient.post('/prescriptions/upload', data: formData);
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -122,6 +164,8 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
         // Reset form
         setState(() {
           _selectedImage = null;
+          _webImageBytes = null;
+          _webImageName = null;
           _notesController.clear();
           _customUrlController.clear();
           _useCustomUrl = false;
@@ -143,6 +187,7 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
       if (mounted) setState(() => isUploading = false);
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -270,10 +315,12 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: Colors.grey.shade300, style: BorderStyle.solid),
                     ),
-                    child: _selectedImage != null
+                    child: (_selectedImage != null || _webImageBytes != null)
                         ? ClipRRect(
                             borderRadius: BorderRadius.circular(12),
-                            child: Image.file(_selectedImage!, fit: BoxFit.cover),
+                            child: kIsWeb
+                                ? Image.memory(_webImageBytes!, fit: BoxFit.cover)
+                                : Image.file(_selectedImage!, fit: BoxFit.cover),
                           )
                         : const Column(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -283,6 +330,7 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
                               Text('Sentuh untuk mengambil/memilih foto resep', style: TextStyle(fontSize: 12, color: Colors.grey)),
                             ],
                           ),
+
                   ),
                 ),
 
@@ -295,9 +343,14 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
                     onChanged: (v) {
                       setState(() {
                         _useCustomUrl = v ?? false;
-                        if (!_useCustomUrl) _selectedImage = null;
+                        if (!_useCustomUrl) {
+                          _selectedImage = null;
+                          _webImageBytes = null;
+                          _webImageName = null;
+                        }
                       });
                     },
+
                   ),
                   const Text('Gunakan URL Kustom untuk testing', style: TextStyle(fontSize: 12)),
                 ],

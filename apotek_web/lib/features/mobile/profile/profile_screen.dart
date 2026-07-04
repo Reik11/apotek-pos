@@ -21,8 +21,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   final _currentPassController = TextEditingController();
   final _newPassController = TextEditingController();
   final _confirmPassController = TextEditingController();
+  final _otpPassController = TextEditingController();
 
   bool _obscureCurrent = true;
+
   bool _obscureNew = true;
   bool _obscureConfirm = true;
 
@@ -57,6 +59,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     _currentPassController.dispose();
     _newPassController.dispose();
     _confirmPassController.dispose();
+    _otpPassController.dispose();
+
     
     _birthDateController.dispose();
     _weightController.dispose();
@@ -476,110 +480,158 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                   () => _obscureConfirm = !_obscureConfirm),
                             ),
                           ),
-                          const SizedBox(height: 8),
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: AppTheme.primary.withOpacity(0.05),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Row(
-                              children: [
-                                Icon(Icons.info_outline,
-                                    size: 14, color: AppTheme.primary),
-                                SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    'Password minimal 6 karakter',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: AppTheme.primary,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton.icon(
-                              onPressed: profileState.isSaving
-                                  ? null
-                                  : () async {
-                                      if (_currentPassController.text.isEmpty ||
-                                          _newPassController.text.isEmpty ||
-                                          _confirmPassController.text.isEmpty) {
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(
-                                          const SnackBar(
-                                            content:
-                                                Text('Semua field harus diisi!'),
-                                            backgroundColor: AppTheme.danger,
-                                          ),
-                                        );
-                                        return;
-                                      }
-                                      if (_newPassController.text !=
-                                          _confirmPassController.text) {
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(
-                                          const SnackBar(
-                                            content: Text(
-                                                'Password baru tidak cocok!'),
-                                            backgroundColor: AppTheme.danger,
-                                          ),
-                                        );
-                                        return;
-                                      }
-                                      if (_newPassController.text.length < 6) {
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(
-                                          const SnackBar(
-                                            content: Text(
-                                                'Password minimal 6 karakter!'),
-                                            backgroundColor: AppTheme.danger,
-                                          ),
-                                        );
-                                        return;
-                                      }
-                                      final success = await ref
-                                          .read(profileProvider.notifier)
-                                          .changePassword(
-                                            currentPassword:
-                                                _currentPassController.text,
-                                            newPassword: _newPassController.text,
-                                          );
-                                      if (success && mounted) {
-                                        _currentPassController.clear();
-                                        _newPassController.clear();
-                                        _confirmPassController.clear();
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(
-                                          const SnackBar(
-                                            content:
-                                                Text('Password berhasil diubah!'),
-                                            backgroundColor: AppTheme.success,
-                                          ),
-                                        );
-                                      }
-                                    },
-                              icon: profileState.isSaving
-                                  ? const SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.white,
-                                      ),
-                                    )
-                                  : const Icon(Icons.lock_reset),
-                              label: const Text('Ubah Password'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppTheme.primaryLight,
-                              ),
-                            ),
-                          ),
+                           const SizedBox(height: 16),
+                           Row(
+                             children: [
+                               Expanded(
+                                 child: _InputField(
+                                   controller: _otpPassController,
+                                   label: 'Masukkan Kode OTP',
+                                   icon: Icons.key_outlined,
+                                   keyboardType: TextInputType.number,
+                                 ),
+                               ),
+                               const SizedBox(width: 8),
+                               ElevatedButton(
+                                 style: ElevatedButton.styleFrom(
+                                   backgroundColor: AppTheme.primary,
+                                   foregroundColor: Colors.white,
+                                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                 ),
+                                 onPressed: () async {
+                                   final ok = await ref.read(profileProvider.notifier).requestChangePasswordOtp();
+                                   if (ok && mounted) {
+                                     ScaffoldMessenger.of(context).showSnackBar(
+                                       const SnackBar(
+                                         content: Text('Kode OTP berhasil dikirim ke email Anda!'),
+                                         backgroundColor: AppTheme.success,
+                                       ),
+                                     );
+                                   }
+                                 },
+                                 child: const Text('Minta OTP', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                               ),
+                             ],
+                           ),
+                           const SizedBox(height: 16),
+                           Container(
+                             padding: const EdgeInsets.all(10),
+                             decoration: BoxDecoration(
+                               color: AppTheme.primary.withOpacity(0.05),
+                               borderRadius: BorderRadius.circular(8),
+                             ),
+                             child: const Row(
+                               children: [
+                                 Icon(Icons.info_outline,
+                                     size: 14, color: AppTheme.primary),
+                                 SizedBox(width: 8),
+                                 Expanded(
+                                   child: Text(
+                                     'Untuk keamanan, Anda wajib meminta & memasukkan OTP sebelum ganti password',
+                                     style: TextStyle(
+                                       fontSize: 12,
+                                       color: AppTheme.primary,
+                                     ),
+                                   ),
+                                 ),
+                               ],
+                             ),
+                           ),
+                           const SizedBox(height: 20),
+                           SizedBox(
+                             width: double.infinity,
+                             child: ElevatedButton.icon(
+                               onPressed: profileState.isSaving
+                                   ? null
+                                   : () async {
+                                       if (_currentPassController.text.isEmpty ||
+                                           _newPassController.text.isEmpty ||
+                                           _confirmPassController.text.isEmpty) {
+                                         ScaffoldMessenger.of(context)
+                                             .showSnackBar(
+                                           const SnackBar(
+                                             content:
+                                                 Text('Semua field harus diisi!'),
+                                             backgroundColor: AppTheme.danger,
+                                           ),
+                                         );
+                                         return;
+                                       }
+                                       if (_newPassController.text !=
+                                           _confirmPassController.text) {
+                                         ScaffoldMessenger.of(context)
+                                             .showSnackBar(
+                                           const SnackBar(
+                                             content: Text(
+                                                 'Password baru tidak cocok!'),
+                                             backgroundColor: AppTheme.danger,
+                                           ),
+                                         );
+                                         return;
+                                       }
+                                       if (_newPassController.text.length < 6) {
+                                         ScaffoldMessenger.of(context)
+                                             .showSnackBar(
+                                           const SnackBar(
+                                             content: Text(
+                                                 'Password minimal 6 karakter!'),
+                                             backgroundColor: AppTheme.danger,
+                                           ),
+                                         );
+                                         return;
+                                       }
+                                       if (_otpPassController.text.isEmpty) {
+                                         ScaffoldMessenger.of(context)
+                                             .showSnackBar(
+                                           const SnackBar(
+                                             content: Text(
+                                                 'Masukkan kode OTP ganti password!'),
+                                             backgroundColor: AppTheme.danger,
+                                           ),
+                                         );
+                                         return;
+                                       }
+                                       final success = await ref
+                                           .read(profileProvider.notifier)
+                                           .changePassword(
+                                             currentPassword:
+                                                 _currentPassController.text,
+                                             newPassword: _newPassController.text,
+                                             otp: _otpPassController.text.trim(),
+                                           );
+                                       if (success && mounted) {
+                                         _currentPassController.clear();
+                                         _newPassController.clear();
+                                         _confirmPassController.clear();
+                                         _otpPassController.clear();
+                                         ScaffoldMessenger.of(context)
+                                             .showSnackBar(
+                                           const SnackBar(
+                                             content:
+                                                 Text('Password berhasil diubah!'),
+                                             backgroundColor: AppTheme.success,
+                                           ),
+                                         );
+                                       }
+                                     },
+                               icon: profileState.isSaving
+                                   ? const SizedBox(
+                                       width: 16,
+                                       height: 16,
+                                       child: CircularProgressIndicator(
+                                         strokeWidth: 2,
+                                         color: Colors.white,
+                                       ),
+                                     )
+                                   : const Icon(Icons.lock_reset),
+                               label: const Text('Ubah Password'),
+                               style: ElevatedButton.styleFrom(
+                                 backgroundColor: AppTheme.primaryLight,
+                               ),
+                             ),
+                           ),
+
                         ],
                       ),
                     ),

@@ -1,3 +1,5 @@
+import { FileInterceptor } from '@nestjs/platform-express';
+import { UseInterceptors, UploadedFile } from '@nestjs/common';
 import {
   Controller, Get, Post, Patch,
   Body, Param, Query, UseGuards, Request,
@@ -18,6 +20,18 @@ export class PrescriptionsController {
       notes: body.notes,
     });
   }
+
+  // Pasien upload file resep asli
+  @Post('upload')
+  @UseInterceptors(FileInterceptor('file'))
+  uploadPrescription(
+    @Request() req: any,
+    @UploadedFile() file: any,
+    @Body('notes') notes?: string,
+  ) {
+    return this.prescriptionsService.createWithFile(req.user.id, file, notes);
+  }
+
 
   // Apoteker lihat semua resep (termasuk data medis pasien)
   @Get()
