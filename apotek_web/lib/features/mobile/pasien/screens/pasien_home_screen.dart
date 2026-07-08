@@ -9,6 +9,8 @@ import '../../../../features/outlets/providers/outlets_provider.dart';
 import '../../profile/profile_screen.dart';
 import 'prescription_screen.dart';
 import 'address_screen.dart';
+import '../../ocr/screens/ocr_screen.dart';
+
 
 class PasienHomeScreen extends ConsumerStatefulWidget {
   const PasienHomeScreen({super.key});
@@ -1170,11 +1172,32 @@ class _PasienHomeScreenState extends ConsumerState<PasienHomeScreen> {
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16),
               children: [
-                _buildCategoryItem(Icons.medication, 'Obat Resep', AppTheme.danger),
+                _buildCategoryItem(
+                  Icons.medication,
+                  'Obat Resep',
+                  AppTheme.danger,
+                  onTap: () async {
+                    final result = await Navigator.push<String>(
+                      context,
+                      MaterialPageRoute(builder: (_) => const OcrScreen()),
+                    );
+                    if (result == 'BUY_PRESCRIPTION') {
+                      setState(() {
+                        _currentIndex = 2; // Pindah ke tab resep (index 2)
+                      });
+                      _loadInitialData();
+                    } else if (result == 'BUY_PREVIOUS') {
+                      setState(() {
+                        _currentIndex = 3; // Pindah ke tab riwayat (index 3)
+                      });
+                    }
+                  },
+                ),
                 _buildCategoryItem(Icons.vaccines, 'Obat Bebas', AppTheme.success),
                 _buildCategoryItem(Icons.health_and_safety, 'Vitamin', AppTheme.warning),
                 _buildCategoryItem(Icons.medical_services, 'P3K', AppTheme.info),
                 _buildCategoryItem(Icons.spa, 'Herbal', Colors.green),
+
               ],
             ),
           ),
@@ -1216,31 +1239,36 @@ class _PasienHomeScreenState extends ConsumerState<PasienHomeScreen> {
     );
   }
 
-  Widget _buildCategoryItem(IconData icon, String label, Color color) {
+  Widget _buildCategoryItem(IconData icon, String label, Color color, {VoidCallback? onTap}) {
     return Container(
       width: 76,
       margin: const EdgeInsets.symmetric(horizontal: 8),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              shape: BoxShape.circle,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: color, size: 28),
             ),
-            child: Icon(icon, color: color, size: 28),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
-            maxLines: 2,
-          ),
-        ],
+            const SizedBox(height: 8),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+              maxLines: 2,
+            ),
+          ],
+        ),
       ),
     );
   }
+
 
   Widget _buildDrugCard(Map<String, dynamic> drug) {
     final batches = drug['batches'] as List? ?? [];

@@ -643,6 +643,11 @@ class _PrescriptionsTabState extends State<_PrescriptionsTab> {
     List<Map<String, dynamic>> selectedDrugs = [];
     bool isDialogLoading = true;
 
+    // OCR variables
+    String ocrRawText = '';
+    List<dynamic> ocrDetectedDrugs = [];
+    bool isOcrLoading = true;
+
     // Fetch drugs
     try {
       final res = await ApiClient.createDio().get('/drugs');
@@ -672,8 +677,47 @@ class _PrescriptionsTabState extends State<_PrescriptionsTab> {
       bsa = math.sqrt((weight * height) / 3600.0);
     }
 
-
     if (!context.mounted) return;
+
+    // Pemicu OCR otomatis di latar belakang saat dialog dibuka
+    void runOcrScan(StateSetter setDialogState) async {
+      try {
+        final res = await ApiClient.createDio().post(
+          '/external/ocr-prescription-url',
+          data: {'imageUrl': prescription['imageUrl']},
+        );
+        final rawText = res.data['rawText'] ?? '';
+        final drugsList = res.data['drugs'] as List? ?? [];
+        
+        // Cari padanan obat lokal apotek berdasarkan nama terdeteksi
+        for (var ocrDrug in drugsList) {
+          final detectedName = ocrDrug['detectedName'].toString().toLowerCase();
+          final matchedLocal = allDrugs.firstWhere(
+            (d) => d['name'].toString().toLowerCase().contains(detectedName) ||
+                   (d['genericName'] != null && d['genericName'].toString().toLowerCase().contains(detectedName)),
+            orElse: () => null,
+          );
+          if (matchedLocal != null) {
+            ocrDrug['localDrugId'] = matchedLocal['id'];
+            ocrDrug['localDrugName'] = matchedLocal['name'];
+            ocrDrug['localDrugPrice'] = matchedLocal['sellPrice'];
+          }
+        }
+
+        setDialogState(() {
+          ocrRawText = rawText;
+          ocrDetectedDrugs = drugsList;
+          isOcrLoading = false;
+        });
+      } catch (e) {
+        setDialogState(() {
+          ocrRawText = 'Gagal memindai resep secara otomatis.';
+          isOcrLoading = false;
+        });
+      }
+    }
+
+    bool hasTriggeredOcr = false;
 
     showDialog(
       context: context,
@@ -686,6 +730,12 @@ class _PrescriptionsTabState extends State<_PrescriptionsTab> {
                 child: Center(child: CircularProgressIndicator()),
               ),
             );
+          }
+
+          // Picu scan sekali saja saat dialog dirender pertama kali
+          if (!hasTriggeredOcr) {
+            hasTriggeredOcr = true;
+            runOcrScan(setDialogState);
           }
 
           return AlertDialog(
@@ -725,6 +775,27 @@ class _PrescriptionsTabState extends State<_PrescriptionsTab> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            const Text('RESEP DOKTER ASLI', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.primary, letterSpacing: 0.5)),
+                            const SizedBox(height: 8),
+                            Container(
+                              width: double.infinity,
+                              height: 150,
+                              decoration: BoxDecoration(
+                                border: Border.all(color: Colors.grey.shade300),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.network(
+                                  prescription['imageUrl'],
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => const Center(
+                                    child: Icon(Icons.image_not_supported_outlined, color: Colors.grey, size: 32),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
                             const Text('DATA KLINIS PASIEN', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.primary, letterSpacing: 0.5)),
                             const Divider(height: 16),
                             
@@ -761,7 +832,80 @@ class _PrescriptionsTabState extends State<_PrescriptionsTab> {
                             const SizedBox(height: 6),
                             _medDetailRow('Fungsi Ginjal', patient['kidneyFunction'] ?? 'Normal'),
                             _medDetailRow('Fungsi Hati', patient['liverFunction'] ?? 'Normal'),
+                            const SizedBox(height: 16),
+                            const Text('REKOMENDASI HASIL SCAN AI', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.success, letterSpacing: 0.5)),
+                            const Divider(height: 16),
+                            if (isOcrLoading)
+                              const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 8),
+                                child: Row(
+                                  children: [
+                                    SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
+                                    SizedBox(width: 8),
+                                    Text('Memindai tulisan resep dokter...', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                                  ],
+                                ),
+                              )
+                            else if (ocrDetectedDrugs.isEmpty)
+                              const Text('Tidak ada obat terbaca otomatis.', style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: Colors.grey))
+                            else
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('Ketuk rekomendasi obat di bawah untuk memasukkan resep:', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                                  const SizedBox(height: 8),
+                                  ...ocrDetectedDrugs.map((ocrDrug) {
+                                    final localName = ocrDrug['localDrugName'];
+                                    final localId = ocrDrug['localDrugId'];
+                                    final detected = ocrDrug['detectedName'];
+                                    
+                                    if (localId == null) {
+                                      return Padding(
+                                        padding: const EdgeInsets.only(bottom: 4),
+                                        child: Text('• $detected (Obat tidak ada di apotek)', style: const TextStyle(fontSize: 11, color: Colors.grey, fontStyle: FontStyle.italic)),
+                                      );
+                                    }
+                                    
+                                    final added = selectedDrugs.any((sd) => sd['drugId'] == localId);
+                                    
+                                    return Padding(
+                                      padding: const EdgeInsets.only(bottom: 6),
+                                      child: InkWell(
+                                        onTap: added ? null : () {
+                                          setDialogState(() {
+                                            selectedDrugs.add({
+                                              'drugId': localId,
+                                              'name': localName,
+                                              'sellPrice': ocrDrug['localDrugPrice'],
+                                              'quantity': 1,
+                                              'notes': '',
+                                            });
+                                          });
+                                        },
+                                        child: Row(
+                                          children: [
+                                            Icon(added ? Icons.check_circle : Icons.add_circle, color: added ? AppTheme.success : AppTheme.primary, size: 16),
+                                            const SizedBox(width: 6),
+                                            Expanded(
+                                              child: Text(
+                                                '$detected -> $localName',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: added ? Colors.grey : AppTheme.textPrimary,
+                                                  decoration: added ? TextDecoration.lineThrough : null,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
+                                ],
+                              ),
                           ],
+
                         ),
                       ),
                     ),
