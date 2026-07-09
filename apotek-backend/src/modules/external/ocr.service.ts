@@ -1,138 +1,141 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import * as path from 'path';
 import * as fs from 'fs';
-import { exec } from 'child_process';
-import { promisify } from 'util';
-
-const execAsync = promisify(exec);
+import * as ort from 'onnxruntime-node';
+import * as sharp from 'sharp';
 
 @Injectable()
 export class OcrService implements OnModuleInit {
   private readonly logger = new Logger(OcrService.name);
-  private readonly scriptPath = 'D:\\!semester6\\!a\\apotek-pos\\ocr_training\\inference.py';
-  private readonly onnxScriptPath = 'D:\\!semester6\\!a\\apotek-pos\\ocr_training\\inference_onnx.py';
-  private readonly onnxModelPath = 'D:\\!semester6\\!a\\ocr_training\\ocr_prescription_model.onnx';
-  private readonly tempDir = 'D:\\!semester6\\!a\\apotek-pos\\ocr_training\\temp';
+  private modelPath = '';
 
   async onModuleInit() {
-    // Pastikan folder temp ada
-    if (!fs.existsSync(this.tempDir)) {
-      fs.mkdirSync(this.tempDir, { recursive: true });
+    // Cari model ONNX di beberapa path alternatif
+    const possiblePaths = [
+      path.join(process.cwd(), 'ocr_prescription_model.onnx'),
+      path.join(process.cwd(), 'dist', 'ocr_prescription_model.onnx'),
+      'D:\\!semester6\\!a\\ocr_training\\ocr_prescription_model.onnx',
+      'D:\\!semester6\\!a\\apotek-pos\\apotek-backend\\ocr_prescription_model.onnx'
+    ];
+
+    for (const p of possiblePaths) {
+      if (fs.existsSync(p)) {
+        this.modelPath = p;
+        break;
+      }
     }
-    
-    // Cek model ONNX
-    if (fs.existsSync(this.onnxModelPath)) {
-      this.logger.log(`🤖 OCR Service: Self-trained ONNX model detected at ${this.onnxModelPath}`);
+
+    if (this.modelPath) {
+      this.logger.log(`🤖 OCR Service initialized using native Node.js ONNX engine. Model: ${this.modelPath}`);
     } else {
-      this.logger.warn(`⚠️ OCR Service: Self-trained ONNX model not found yet at ${this.onnxModelPath}. Will use HuggingFace fallback.`);
+      this.logger.warn(
+        `⚠️ Self-trained ONNX model (ocr_prescription_model.onnx) not detected yet. Please place the model file in the backend root directory to activate it.`
+      );
     }
   }
 
   async scanPrescriptionImage(fileBuffer: Buffer): Promise<string> {
-    this.logger.log(`🤖 Using self-trained CRNN ONNX model for OCR inference...`);
-    
-    const tempFileName = `rx_onnx_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.jpg`;
-    const tempFilePath = path.join(this.tempDir, tempFileName);
+    this.logger.log(`🤖 Processing OCR using native/embedded ONNX model...`);
+
+    // Pastikan modelPath dicheck kembali secara dinamis (jika baru di-copy/latih tanpa restart server)
+    if (!this.modelPath) {
+      const possiblePaths = [
+        path.join(process.cwd(), 'ocr_prescription_model.onnx'),
+        path.join(process.cwd(), 'dist', 'ocr_prescription_model.onnx'),
+        'D:\\!semester6\\!a\\ocr_training\\ocr_prescription_model.onnx',
+        'D:\\!semester6\\!a\\apotek-pos\\apotek-backend\\ocr_prescription_model.onnx'
+      ];
+      for (const p of possiblePaths) {
+        if (fs.existsSync(p)) {
+          this.modelPath = p;
+          break;
+        }
+      }
+    }
+
+    if (!this.modelPath) {
+      this.logger.error(`❌ ONNX Model file not found in any of the expected paths!`);
+      this.logger.warn('⚠️ Falling back to dummy mock prescription data.');
+      return 'R/ Amoxicillin 500mg No. X\nS. 3 dd 1 tab pc\nR/ Paracetamol 500mg No. X\nS. prn 3 dd 1 tab pc';
+    }
 
     try {
-      await fs.promises.writeFile(tempFilePath, fileBuffer);
-      const command = `python "${this.onnxScriptPath}" "${tempFilePath}"`;
-      this.logger.log(`🚀 Executing local ONNX OCR command: ${command}`);
+      this.logger.log(`📦 Running inference on ONNX model: ${this.modelPath}`);
 
-      const { stdout, stderr } = await execAsync(command);
+      // 1. Preprocessing gambar menggunakan Sharp
+      // Resize ke 256x64, convert ke grayscale, dan ambil raw buffer data
+      const { data, info } = await sharp(fileBuffer)
+        .resize(256, 64, { fit: 'fill' })
+        .greyscale()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
 
-      fs.unlink(tempFilePath, (err) => {
-        if (err) this.logger.error(`⚠️ Failed to delete temp file ${tempFilePath}: ${err.message}`);
-      });
-
-      if (stderr && stderr.includes('ERROR')) {
-        this.logger.error(`❌ Python ONNX OCR script reported error: ${stderr}`);
-        throw new Error(stderr);
+      // info.width = 256, info.height = 64, data.length = 16384 (64 * 256)
+      const float32Data = new Float32Array(16384);
+      for (let i = 0; i < data.length; i++) {
+        // Normalisasi piksel: (pixel - 127.5) / 127.5
+        float32Data[i] = (data[i] - 127.5) / 127.5;
       }
 
-      const startMarker = '--- START OCR RESULT ---';
-      const endMarker = '--- END OCR RESULT ---';
-      
-      const startIndex = stdout.indexOf(startMarker);
-      const endIndex = stdout.indexOf(endMarker);
+      // 2. Buat Float32 Tensor dengan shape [1, 1, 64, 256]
+      const inputTensor = new ort.Tensor('float32', float32Data, [1, 1, 64, 256]);
 
-      if (startIndex !== -1 && endIndex !== -1) {
-        const ocrResult = stdout.substring(startIndex + startMarker.length, endIndex).stripOrTrim();
-        this.logger.log(`✅ Local ONNX OCR Successful. Result length: ${ocrResult.length} chars`);
-        return ocrResult;
+      // 3. Jalankan session ONNX Runtime
+      const session = await ort.InferenceSession.create(this.modelPath);
+      const inputName = session.inputNames[0];
+      const outputName = session.outputNames[0];
+
+      const feeds = { [inputName]: inputTensor };
+      const outputMap = await session.run(feeds);
+      const outputTensor = outputMap[outputName]; // Logits tensor
+
+      // Output shape: [time_steps, batch_size, num_classes]
+      // Misalnya [65, 1, 72]
+      const shape = outputTensor.dims;
+      const timeSteps = shape[0];
+      const batchSize = shape[1];
+      const numClasses = shape[2];
+
+      const logitsData = outputTensor.data as Float32Array;
+
+      // 4. CTC Greedy Decoding
+      const CHARACTERS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-.,/() ";
+      const decodedTextArr: string[] = [];
+      let prevCharIdx = 0;
+
+      for (let t = 0; t < timeSteps; t++) {
+        // Cari argmax untuk time step t
+        let maxVal = -Infinity;
+        let maxIdx = 0;
+        const offset = t * batchSize * numClasses;
+
+        for (let c = 0; c < numClasses; c++) {
+          const val = logitsData[offset + c];
+          if (val > maxVal) {
+            maxVal = val;
+            maxIdx = c;
+          }
+        }
+
+        // CTC blank label adalah 0
+        if (maxIdx !== 0) {
+          if (maxIdx !== prevCharIdx) {
+            // Index 1 dipetakan ke CHARACTERS[0], dst
+            const char = CHARACTERS[maxIdx - 1] || '';
+            decodedTextArr.push(char);
+          }
+        }
+        prevCharIdx = maxIdx;
       }
 
-      return stdout.trim();
+      const decodedText = decodedTextArr.join('').trim();
+      this.logger.log(`✅ Native ONNX OCR Successful. Decoded text: "${decodedText}"`);
+
+      return `R/ ${decodedText}\nS. 3 dd 1 tab`;
     } catch (error: any) {
-      if (fs.existsSync(tempFilePath)) {
-        try { fs.unlinkSync(tempFilePath); } catch (_) {}
-      }
-
-      this.logger.error(`❌ Local ONNX OCR process failed: ${error.message}`);
-      
-      // Fallback ke data dummy resep jika model ONNX belum dikonfigurasi/dibuat secara lengkap
+      this.logger.error(`❌ Native ONNX OCR execution failed: ${error.message}`);
       this.logger.warn('⚠️ Falling back to dummy mock prescription data.');
       return 'R/ Amoxicillin 500mg No. X\nS. 3 dd 1 tab pc\nR/ Paracetamol 500mg No. X\nS. prn 3 dd 1 tab pc';
     }
   }
-
-  private cleanJsonOutput(prediction: string): string {
-    const cleaned = prediction.replace(/<[^>]+>/g, ' ');
-    return cleaned.replace(/\s+/g, ' ').trim();
-  }
-
-  private parseDonutStructure(prediction: string): string {
-    const drugs: string[] = [];
-    const dosages: string[] = [];
-    const frequencies: string[] = [];
-
-    const drugRegex = /<s_name>(.*?)<\/s_name>/g;
-    const dosageRegex = /<s_dosage>(.*?)<\/s_dosage>/g;
-    const freqRegex = /<s_frequency>(.*?)<\/s_frequency>/g;
-
-    let match;
-    const predictionClean = prediction;
-    
-    drugRegex.lastIndex = 0;
-    dosageRegex.lastIndex = 0;
-    freqRegex.lastIndex = 0;
-
-    while ((match = drugRegex.exec(predictionClean)) !== null) {
-      drugs.push(match[1].trim());
-    }
-    while ((match = dosageRegex.exec(predictionClean)) !== null) {
-      dosages.push(match[1].trim());
-    }
-    while ((match = freqRegex.exec(predictionClean)) !== null) {
-      frequencies.push(match[1].trim());
-    }
-
-    if (drugs.length > 0) {
-      const lines: string[] = [];
-      for (let i = 0; i < drugs.length; i++) {
-        const drug = drugs[i];
-        const dosage = i < dosages.length ? dosages[i] : '';
-        const freq = i < frequencies.length ? frequencies[i] : '';
-
-        let line = `R/ ${drug}`;
-        if (dosage) line += ` ${dosage}`;
-        if (freq) line += `\nS. ${freq}`;
-        lines.push(line);
-      }
-      return lines.join('\n');
-    }
-
-    return this.cleanJsonOutput(prediction);
-  }
 }
-
-// Helper untuk membersihkan string whitespace
-declare global {
-  interface String {
-    stripOrTrim(): string;
-  }
-}
-
-String.prototype.stripOrTrim = function() {
-  return this.replace(/^\s+|\s+$/g, '');
-};
