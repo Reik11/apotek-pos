@@ -27,6 +27,33 @@ export class OcrService implements OnModuleInit {
   }
 
   async scanPrescriptionImage(fileBuffer: Buffer): Promise<string> {
+    const hfSpaceUrl = process.env.HF_SPACE_URL;
+
+    if (hfSpaceUrl) {
+      this.logger.log(`🌐 Routing OCR request to Hugging Face Space API: ${hfSpaceUrl}`);
+      try {
+        const formData = new FormData();
+        const blob = new Blob([fileBuffer], { type: 'image/jpeg' });
+        formData.append('file', blob, 'prescription.jpg');
+
+        const response = await fetch(`${hfSpaceUrl.replace(/\/$/, '')}/predict`, {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          throw new Error(`HF Space returned status: ${response.statusText}`);
+        }
+
+        const data: any = await response.json();
+        const ocrResult = data.text || '';
+        this.logger.log(`✅ HF Space OCR Successful. Result length: ${ocrResult.length} chars`);
+        return ocrResult;
+      } catch (error: any) {
+        this.logger.error(`❌ HF Space OCR failed: ${error.message}. Falling back to local Python OCR.`);
+      }
+    }
+
     const tempFileName = `rx_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.jpg`;
     const tempFilePath = path.join(this.tempDir, tempFileName);
 
