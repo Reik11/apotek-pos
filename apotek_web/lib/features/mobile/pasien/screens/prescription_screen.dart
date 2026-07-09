@@ -6,8 +6,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:dio/dio.dart' as dio;
+import 'package:permission_handler/permission_handler.dart';
 import '../../../../core/api/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../features/auth/providers/auth_provider.dart';
+
+
 
 
 class PrescriptionScreen extends ConsumerStatefulWidget {
@@ -51,7 +55,8 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
   Future<void> _loadPrescriptions() async {
     setState(() => isLoading = true);
     try {
-      final response = await ApiClient.createDio().get('/prescriptions/my');
+      final token = ref.read(authProvider).token;
+      final response = await ApiClient.createDio(token: token).get('/prescriptions/my');
       setState(() {
         prescriptions = response.data as List? ?? [];
         isLoading = false;
@@ -70,6 +75,21 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
   }
 
   Future<void> _pickImage(ImageSource source) async {
+    if (!kIsWeb && source == ImageSource.camera) {
+      final status = await Permission.camera.request();
+      if (!status.isGranted) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Izin kamera diperlukan untuk memotret resep!'),
+              backgroundColor: AppTheme.danger,
+            ),
+          );
+        }
+        return;
+      }
+    }
+
     final picker = ImagePicker();
     try {
       final pickedFile = await picker.pickImage(
@@ -101,6 +121,7 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
     }
   }
 
+
   Future<void> _submitPrescription() async {
     final hasImage = _selectedImage != null || _webImageBytes != null;
     if (!hasImage && (!_useCustomUrl || _customUrlController.text.trim().isEmpty)) {
@@ -116,7 +137,8 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
     setState(() => isUploading = true);
 
     try {
-      final dioClient = ApiClient.createDio();
+      final token = ref.read(authProvider).token;
+      final dioClient = ApiClient.createDio(token: token);
 
       if (_useCustomUrl && _customUrlController.text.trim().isNotEmpty) {
         // Link kustom

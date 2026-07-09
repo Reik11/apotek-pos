@@ -1099,19 +1099,25 @@ class _InfoRow extends StatelessWidget {
               fontSize: 13,
             ),
           ),
-          const Spacer(),
-          Text(
-            value,
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              fontSize: 13,
-              color: valueColor ?? AppTheme.textPrimary,
+          const SizedBox(width: 16),
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+                color: valueColor ?? AppTheme.textPrimary,
+              ),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
             ),
           ),
         ],
       ),
     );
   }
+
 }
 
 class _MessageBanner extends StatelessWidget {

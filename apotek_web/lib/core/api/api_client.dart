@@ -23,7 +23,7 @@ class ApiClient {
 
   static final FlutterSecureStorage _storage = const FlutterSecureStorage();
 
-  static Dio createDio() {
+  static Dio createDio({String? token}) {
     final dio = Dio(BaseOptions(
       baseUrl: baseUrl,
       connectTimeout: const Duration(seconds: 60),
@@ -34,9 +34,9 @@ class ApiClient {
     dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
-          final token = await _storage.read(key: 'access_token');
-          if (token != null) {
-            options.headers['Authorization'] = 'Bearer $token';
+          final activeToken = token ?? await _storage.read(key: 'access_token');
+          if (activeToken != null) {
+            options.headers['Authorization'] = 'Bearer $activeToken';
           }
           return handler.next(options);
         },
@@ -51,4 +51,5 @@ class ApiClient {
 
     return dio;
   }
+
 }

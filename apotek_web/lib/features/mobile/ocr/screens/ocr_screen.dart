@@ -10,6 +10,8 @@ import 'package:intl/intl.dart';
 import 'package:dio/dio.dart' as dio;
 import '../../../../core/api/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../features/auth/providers/auth_provider.dart';
+
 
 
 class OcrScreen extends ConsumerStatefulWidget {
@@ -132,7 +134,8 @@ class _OcrScreenState extends ConsumerState<OcrScreen> {
   // Kirim hasil OCR ke backend
   Future<void> _analyzeDrugs(String text) async {
     try {
-      final response = await ApiClient.createDio().post(
+      final token = ref.read(authProvider).token;
+      final response = await ApiClient.createDio(token: token).post(
         '/external/ocr-analyze',
         data: {'text': text},
       );
@@ -157,7 +160,8 @@ class _OcrScreenState extends ConsumerState<OcrScreen> {
     setState(() => _isUploadingPurchase = true);
 
     try {
-      final dioClient = ApiClient.createDio();
+      final token = ref.read(authProvider).token;
+      final dioClient = ApiClient.createDio(token: token);
       final dio.FormData formData = dio.FormData();
       formData.fields.add(const MapEntry('notes', 'Diajukan otomatis dari hasil scan resep.'));
 
@@ -255,21 +259,23 @@ class _OcrScreenState extends ConsumerState<OcrScreen> {
   Future<void> _parseManually(String text) async {
     final lines = text.split('\n');
     final drugs = <Map<String, dynamic>>[];
+    final token = ref.read(authProvider).token;
 
     for (final line in lines) {
       if (line.trim().isEmpty) continue;
 
       try {
         // Cari info obat dari RxNorm berdasarkan setiap baris
-        final response = await ApiClient.createDio().get(
+        final response = await ApiClient.createDio(token: token).get(
             '/external/rxnorm/search?name=${Uri.encodeComponent(line.trim())}');
 
         final results = response.data as List? ?? [];
         if (results.isNotEmpty) {
           // Cari di database lokal apotek
-          final localResponse = await ApiClient.createDio()
+          final localResponse = await ApiClient.createDio(token: token)
               .get('/drugs?search=${Uri.encodeComponent(line.trim())}');
           final localDrugs = localResponse.data as List? ?? [];
+
 
           drugs.add({
             'detectedName': line.trim(),

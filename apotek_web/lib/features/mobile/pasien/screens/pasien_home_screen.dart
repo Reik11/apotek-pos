@@ -2279,9 +2279,10 @@ class _PasienHomeScreenState extends ConsumerState<PasienHomeScreen> {
                             ),
                             child: InkWell(
                               borderRadius: BorderRadius.circular(16),
-                              onTap: () {
+                              onTap: () async {
                                 ref.read(outletsProvider.notifier).selectOutlet(outlet);
                                 _loadInitialData(); // Reload drugs for selected outlet
+                                await _checkFirstTimeProfileFill();
                               },
                               child: Padding(
                                 padding: const EdgeInsets.all(20.0),
@@ -2344,6 +2345,15 @@ class _PasienHomeScreenState extends ConsumerState<PasienHomeScreen> {
                                       ),
                                     ),
                                     const SizedBox(width: 12),
+                                    // Tombol Peta Lokasi
+                                    IconButton(
+                                      icon: const Icon(Icons.map_rounded, color: AppTheme.primary),
+                                      tooltip: 'Lihat Peta Lokasi',
+                                      onPressed: () {
+                                        _showOutletMapDialog(context, outlet);
+                                      },
+                                    ),
+                                    const SizedBox(width: 6),
                                     Container(
                                       padding: const EdgeInsets.all(10),
                                       decoration: BoxDecoration(
@@ -2369,4 +2379,156 @@ class _PasienHomeScreenState extends ConsumerState<PasienHomeScreen> {
       ),
     );
   }
+
+  // Cek pengisian profil medis pertama kali (pop-up isi data diri)
+  Future<void> _checkFirstTimeProfileFill() async {
+    try {
+      final res = await ApiClient.createDio().get('/users/medical-profile');
+      final medicalData = Map<String, dynamic>.from(res.data as Map);
+      
+      final weight = medicalData['weight'];
+      final height = medicalData['height'];
+      
+      if (weight == null || height == null || (weight as num) == 0 || (height as num) == 0) {
+        if (!mounted) return;
+        
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: const Row(
+              children: [
+                Icon(Icons.health_and_safety_rounded, color: AppTheme.primary, size: 28),
+                SizedBox(width: 8),
+                Text('Lengkapi Profil Medis', style: TextStyle(fontWeight: FontWeight.bold)),
+              ],
+            ),
+            content: const Text(
+              'Selamat datang di Medika!\n\nUntuk membantu Apoteker memvalidasi kesesuaian dosis obat dan keamanan resep Anda nanti, mohon luangkan waktu sebentar untuk mengisi tinggi badan, berat badan, dan alergi Anda.',
+              style: TextStyle(fontSize: 13, height: 1.4),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Nanti Saja', style: TextStyle(color: Colors.grey)),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primary,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  setState(() {
+                    _currentIndex = 4; // Pindah ke tab Profil (index 4)
+                  });
+                },
+                child: const Text('Isi Sekarang'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (_) {
+      // Abaikan jika API gagal
+    }
+  }
+
+  // Tampilkan Dialog Peta Lokasi Outlet
+  void _showOutletMapDialog(BuildContext context, Map<String, dynamic> outlet) {
+    final double lat = outlet['latitude'] != null ? (outlet['latitude'] as num).toDouble() : -6.2000;
+    final double lng = outlet['longitude'] != null ? (outlet['longitude'] as num).toDouble() : 106.8166;
+    final name = outlet['name'] ?? 'Apotek';
+    final address = outlet['address'] ?? '';
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            const Icon(Icons.location_on, color: AppTheme.danger),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  Text(address, style: const TextStyle(fontSize: 11, color: Colors.grey), maxLines: 1, overflow: TextOverflow.ellipsis),
+                ],
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 450,
+              height: 250,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Stack(
+                  children: [
+                    Image.network(
+                      'https://static-maps.yandex.ru/1.x/?lang=en_US&ll=$lng,$lat&z=15&l=map&size=450,250&pmwt~M',
+                      fit: BoxFit.cover,
+                      width: 450,
+                      height: 250,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        color: const Color(0xFF1E1E1E),
+                        child: Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.map_outlined, color: Colors.white38, size: 48),
+                              const SizedBox(height: 8),
+                              Text('Koordinat: $lat, $lng', style: const TextStyle(color: Colors.white54, fontSize: 12)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.only(bottom: 24),
+                        child: Icon(Icons.location_on, color: Colors.red, size: 36),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Koordinat GPS: $lat, $lng',
+              style: const TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: Colors.grey),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Tutup'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              ref.read(outletsProvider.notifier).selectOutlet(outlet);
+              _loadInitialData(); // Reload
+              await _checkFirstTimeProfileFill();
+            },
+            child: const Text('Pilih Apotek Ini'),
+          ),
+        ],
+      ),
+    );
+  }
+
 }
