@@ -38,18 +38,32 @@ class HuggingFaceOcrDataset(Dataset):
         self.dataset = hf_dataset
         self.transform = transform
         
+        # Ambil sampel item pertama untuk mendeteksi keys secara riil
+        first_item = hf_dataset[0]
+        keys = list(first_item.keys())
+        print(f"DEBUG: Dataset item keys are: {keys}")
+        
         # Cari nama kolom label secara dinamis
         self.label_col = None
         for col in ['label', 'text', 'word', 'label_text']:
-            if col in hf_dataset.column_names:
+            if col in keys:
                 self.label_col = col
                 break
         if not self.label_col:
-            for col in hf_dataset.column_names:
+            for col in keys:
                 if col != 'image':
                     self.label_col = col
                     break
+                    
         print(f"📌 Menggunakan kolom label: '{self.label_col}'")
+        
+        # Cek jika kolom tersebut adalah ClassLabel (kategori integer ID)
+        self.classes = None
+        if self.label_col and self.label_col in hf_dataset.features:
+            from datasets import ClassLabel
+            feature = hf_dataset.features[self.label_col]
+            if isinstance(feature, ClassLabel):
+                self.classes = feature
 
     def __len__(self):
         return len(self.dataset)
@@ -59,13 +73,10 @@ class HuggingFaceOcrDataset(Dataset):
         image = item['image'].convert('L')
         
         # Baca label secara dinamis
-        label_val = item[self.label_col]
+        label_val = item[self.label_col] if self.label_col else ""
         
-        # Cek jika kolom tersebut adalah ClassLabel atau string biasa
-        from datasets import ClassLabel
-        feature = self.dataset.features[self.label_col]
-        if isinstance(feature, ClassLabel):
-            label = feature.int2str(label_val)
+        if self.classes is not None:
+            label = self.classes.int2str(label_val)
         else:
             label = str(label_val)
         
