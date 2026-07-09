@@ -73,12 +73,27 @@ class HuggingFaceOcrDataset(Dataset):
         image = item['image'].convert('L')
         
         # Baca label secara dinamis
-        label_val = item[self.label_col] if self.label_col else ""
-        
-        if self.classes is not None:
-            label = self.classes.int2str(label_val)
+        label = ""
+        if self.label_col:
+            label_val = item[self.label_col]
+            if self.classes is not None:
+                label = self.classes.int2str(label_val)
+            else:
+                label = str(label_val)
         else:
-            label = str(label_val)
+            # Jika tidak ada kolom label, ambil kata obat dari nama file gambar asli
+            import re
+            filename = getattr(item['image'], 'filename', '')
+            if filename:
+                basename = os.path.splitext(os.path.basename(filename))[0]
+                # Hilangkan angka-angka indeks (misal: 'Amoxicillin_1' -> 'Amoxicillin')
+                label = re.sub(r'[\d_-]+', ' ', basename).strip()
+            else:
+                label = "prescription"
+                
+        # Cetak sesekali saja untuk meyakinkan label terisi dengan nama obat
+        if idx == 0 or idx == 10 or idx == 20:
+            print(f"DEBUG: Dataset item index {idx} mapped to label word: '{label}'")
         
         if self.transform:
             image = self.transform(image)
