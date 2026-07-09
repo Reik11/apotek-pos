@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:intl/intl.dart';
 import 'package:dio/dio.dart' as dio;
 import 'package:permission_handler/permission_handler.dart';
@@ -37,6 +38,14 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
   Uint8List? _webImageBytes;
   String? _webImageName;
   bool _useCustomUrl = false;
+
+  // Variabel OCR
+  String _ocrText = '';
+  List<Map<String, dynamic>> _detectedDrugs = [];
+  bool _isOcrProcessing = false;
+  bool _isUploadingPurchase = false;
+  final currency = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
+
 
 
   @override
@@ -119,6 +128,176 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
         );
       }
     }
+  }
+
+
+  Future<void> _processImageOcr() async {
+    final hasImage = _selectedImage != null || _webImageBytes != null;
+    if (!hasImage) return;
+
+    setState(() {
+      _isOcrProcessing = true;
+      _ocrText = '';
+      _detectedDrugs = [];
+    });
+
+    try {
+      if (kIsWeb) {
+        final token = ref.read(authProvider).token;
+        final dioClient = ApiClient.createDio(token: token);
+        final dio.FormData formData = dio.FormData();
+        
+        formData.files.add(MapEntry(
+          'file',
+          dio.MultipartFile.fromBytes(
+            _webImageBytes!,
+            filename: _webImageName ?? 'prescription.jpg',
+          ),
+        ));
+
+        final response = await dioClient.post(
+          '/external/ocr-prescription',
+          data: formData,
+        );
+
+        final String detectedText = response.data['text'] ?? '';
+        setState(() {
+          _ocrText = detectedText;
+        });
+
+        await _analyzeDrugsOcr(detectedText);
+      } else {
+        final inputImage = InputImage.fromFilePath(_selectedImage!.path);
+        final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
+        final RecognizedText recognizedText = await textRecognizer.processImage(inputImage);
+        
+        await textRecognizer.close();
+
+        final String detectedText = recognizedText.text;
+        setState(() {
+          _ocrText = detectedText;
+        });
+
+        if (detectedText.trim().isEmpty) {
+          setState(() => _isOcrProcessing = false);
+          return;
+        }
+
+        await _analyzeDrugsOcr(detectedText);
+      }
+    } catch (e) {
+      setState(() => _isOcrProcessing = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal memproses OCR: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _analyzeDrugsOcr(String text) async {
+    try {
+      final token = ref.read(authProvider).token;
+      final response = await ApiClient.createDio(token: token).post(
+        '/external/ocr-analyze',
+        data: {'text': text},
+      );
+
+      setState(() {
+        _detectedDrugs = List<Map<String, dynamic>>.from(response.data['drugs'] ?? []);
+        _isOcrProcessing = false;
+      });
+    } catch (e) {
+      await _parseManuallyOcr(text);
+    }
+  }
+
+  Future<void> _parseManuallyOcr(String text) async {
+    final lines = text.split('\n');
+    final drugs = <Map<String, dynamic>>[];
+    final token = ref.read(authProvider).token;
+
+    for (final line in lines) {
+      if (line.trim().isEmpty) continue;
+
+      try {
+        final response = await ApiClient.createDio(token: token).get(
+            '/external/rxnorm/search?name=${Uri.encodeComponent(line.trim())}');
+
+        final results = response.data as List? ?? [];
+        if (results.isNotEmpty) {
+          final localResponse = await ApiClient.createDio(token: token)
+              .get('/drugs?search=${Uri.encodeComponent(line.trim())}');
+          final localDrugs = localResponse.data as List? ?? [];
+
+          drugs.add({
+            'detectedName': line.trim(),
+            'rxnorm': results.first,
+            'localDrugs': localDrugs,
+          });
+        }
+      } catch (e) {
+        continue;
+      }
+    }
+
+    setState(() {
+      _detectedDrugs = drugs;
+      _isOcrProcessing = false;
+    });
+  }
+
+  void _showJustInfoDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.info_outline, color: AppTheme.primary),
+            SizedBox(width: 8),
+            Text('Informasi Kandungan Obat'),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Hasil scan ini hanya digunakan untuk pencarian informasi kandungan obat (tidak diajukan ke Apoteker).',
+                style: TextStyle(fontSize: 13),
+              ),
+              const SizedBox(height: 12),
+              ..._detectedDrugs.map((drug) {
+                final name = drug['detectedName'] ?? '-';
+                final rxnormName = drug['rxnorm']?['name'] ?? 'Kandungan umum';
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Text('• $name ($rxnormName)', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                );
+              }).toList(),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              // Reset setelah hanya info
+              setState(() {
+                _selectedImage = null;
+                _webImageBytes = null;
+                _webImageName = null;
+                _ocrText = '';
+                _detectedDrugs = [];
+              });
+            },
+            child: const Text('Selesai & Reset'),
+          ),
+        ],
+      ),
+    );
   }
 
 
@@ -407,24 +586,154 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
               const SizedBox(height: 24),
               
               // Submit Button
-              isUploading
-                  ? const Center(
-                      child: Column(
-                        children: [
-                          CircularProgressIndicator(),
-                          SizedBox(height: 8),
-                          Text('Sedang mengunggah resep...', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                        ],
+              // Submit & OCR Flow
+              if (_isOcrProcessing)
+                const Center(
+                  child: Column(
+                    children: [
+                      CircularProgressIndicator(),
+                      SizedBox(height: 12),
+                      Text('Membaca resep dengan OCR...', style: TextStyle(fontWeight: FontWeight.bold)),
+                      Text('Mengidentifikasi kandungan obat...', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                    ],
+                  ),
+                )
+              else if (isUploading)
+                const Center(
+                  child: Column(
+                    children: [
+                      CircularProgressIndicator(),
+                      SizedBox(height: 8),
+                      Text('Sedang mengunggah resep ke Apoteker...', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                    ],
+                  ),
+                )
+              else if ((_selectedImage != null || _webImageBytes != null) && _ocrText.isEmpty)
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 48),
+                    backgroundColor: AppTheme.primary,
+                  ),
+                  onPressed: _processImageOcr,
+                  icon: const Icon(Icons.document_scanner),
+                  label: const Text('Scan & Proses Resep Dokter (OCR)'),
+                )
+              else if (_ocrText.isNotEmpty) ...[
+                // Hasil OCR teks
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Teks Terbaca:',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                       ),
-                    )
-                  : ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        minimumSize: const Size(double.infinity, 48),
-                        backgroundColor: AppTheme.primary,
+                      const SizedBox(height: 4),
+                      Text(
+                        _ocrText,
+                        style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
                       ),
-                      onPressed: _submitPrescription,
-                      child: const Text('Unggah Resep Dokter'),
-                    ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                
+                // Hasil deteksi obat
+                if (_detectedDrugs.isNotEmpty) ...[
+                  Text(
+                    'Obat Terdeteksi (${_detectedDrugs.length})',
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                  ),
+                  const SizedBox(height: 8),
+                  ..._detectedDrugs.map((drug) => _PrescriptionDrugResultCard(
+                        drug: drug,
+                        currency: currency,
+                      )),
+                  const SizedBox(height: 16),
+                ],
+
+                // Panel Pilihan Tindakan Anda
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppTheme.primary.withOpacity(0.2)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'PILIHAN TINDAKAN ANDA:',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.primary),
+                      ),
+                      const SizedBox(height: 12),
+                      
+                      // Opsi 1: Tebus & Beli
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          minimumSize: const Size(double.infinity, 44),
+                          backgroundColor: AppTheme.primary,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        onPressed: _submitPrescription,
+                        icon: const Icon(Icons.shopping_cart_checkout),
+                        label: const Text('Tebus & Beli Obat Ini'),
+                      ),
+                      const SizedBox(height: 8),
+                      
+                      // Opsi 2: Sekedar Ingin Tahu
+                      OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(double.infinity, 44),
+                          foregroundColor: AppTheme.primary,
+                          side: const BorderSide(color: AppTheme.primary, width: 1.5),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        onPressed: _showJustInfoDialog,
+                        icon: const Icon(Icons.info_outline),
+                        label: const Text('Saya Hanya Ingin Tahu Info Obat'),
+                      ),
+                      const SizedBox(height: 8),
+
+                      // Opsi 3: Batal / Scan Ulang
+                      TextButton.icon(
+                        style: TextButton.styleFrom(
+                          minimumSize: const Size(double.infinity, 44),
+                          foregroundColor: Colors.red,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _selectedImage = null;
+                            _webImageBytes = null;
+                            _webImageName = null;
+                            _ocrText = '';
+                            _detectedDrugs = [];
+                          });
+                        },
+                        icon: const Icon(Icons.restart_alt),
+                        label: const Text('Batal & Scan Ulang'),
+                      ),
+                    ],
+                  ),
+                ),
+              ] else
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 48),
+                    backgroundColor: AppTheme.primary,
+                  ),
+                  onPressed: _submitPrescription,
+                  child: const Text('Unggah Resep Dokter'),
+                ),
             ],
           ),
         ),
@@ -611,3 +920,290 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
     );
   }
 }
+
+class _PrescriptionDrugResultCard extends StatefulWidget {
+  final Map<String, dynamic> drug;
+  final NumberFormat currency;
+
+  const _PrescriptionDrugResultCard({
+    required this.drug,
+    required this.currency,
+  });
+
+  @override
+  State<_PrescriptionDrugResultCard> createState() => _PrescriptionDrugResultCardState();
+}
+
+class _PrescriptionDrugResultCardState extends State<_PrescriptionDrugResultCard> {
+  bool _showDetails = false;
+  Map<String, dynamic>? _fdaInfo;
+
+  Future<void> _loadFdaInfo() async {
+    try {
+      final name = widget.drug['detectedName'] ?? '';
+      final response =
+          await ApiClient.createDio().get('/external/fda/label?name=$name');
+      setState(() => _fdaInfo = response.data);
+    } catch (e) {
+      // FDA info tidak tersedia
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final localDrugs = widget.drug['localDrugs'] as List? ?? [];
+    final rxnorm = widget.drug['rxnorm'] as Map? ?? {};
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Header
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.medication, color: AppTheme.primary),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.drug['detectedName'] ?? '-',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                      if (rxnorm['name'] != null)
+                        Text(
+                          rxnorm['name'],
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.textSecondary,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: Icon(
+                    _showDetails
+                        ? Icons.keyboard_arrow_up
+                        : Icons.keyboard_arrow_down,
+                  ),
+                  onPressed: () {
+                    setState(() => _showDetails = !_showDetails);
+                    if (_showDetails && _fdaInfo == null) {
+                      _loadFdaInfo();
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+
+          // Detail info
+          if (_showDetails) ...[
+            const Divider(height: 1),
+
+            // Info FDA
+            if (_fdaInfo != null)
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (_fdaInfo!['indications'] != null) ...[
+                      const Text(
+                        'Indikasi:',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                          color: AppTheme.primary,
+                        ),
+                      ),
+                      Text(
+                        _fdaInfo!['indications'],
+                        style: const TextStyle(fontSize: 12),
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                    if (_fdaInfo!['sideEffects'] != null) ...[
+                      const Text(
+                        'Efek Samping:',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                          color: AppTheme.danger,
+                        ),
+                      ),
+                      Text(
+                        _fdaInfo!['sideEffects'],
+                        style: const TextStyle(fontSize: 12),
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+
+            // Tersedia di apotek ini
+            if (localDrugs.isNotEmpty) ...[
+              const Divider(height: 1),
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '✅ Tersedia di Apotek Ini:',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: AppTheme.success,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ...localDrugs.take(3).map((d) => Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      d['name'],
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                    Row(
+                                      children: [
+                                        _PrescriptionTypeBadge(type: d['type']),
+                                        const SizedBox(width: 4),
+                                        _PrescriptionCategoryBadge(category: d['category']),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Text(
+                                widget.currency.format(d['sellPrice']),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.primary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )),
+                  ],
+                ),
+              ),
+            ] else
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  children: [
+                    const Icon(Icons.info_outline,
+                        color: AppTheme.warning, size: 16),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Obat tidak tersedia di apotek ini',
+                      style: TextStyle(
+                        color: AppTheme.warning,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _PrescriptionTypeBadge extends StatelessWidget {
+  final String type;
+  const _PrescriptionTypeBadge({required this.type});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: type == 'GENERIK'
+            ? AppTheme.success.withOpacity(0.1)
+            : AppTheme.primaryLight.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        type,
+        style: TextStyle(
+          fontSize: 10,
+          color: type == 'GENERIK' ? AppTheme.success : AppTheme.primaryLight,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+}
+
+class _PrescriptionCategoryBadge extends StatelessWidget {
+  final String category;
+  const _PrescriptionCategoryBadge({required this.category});
+
+  @override
+  Widget build(BuildContext context) {
+    Color color;
+    switch (category) {
+      case 'KERAS':
+        color = AppTheme.danger;
+        break;
+      case 'BEBAS_TERBATAS':
+        color = AppTheme.warning;
+        break;
+      default:
+        color = AppTheme.success;
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        category,
+        style:
+            TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+}
+
