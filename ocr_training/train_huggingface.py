@@ -37,21 +37,37 @@ class HuggingFaceOcrDataset(Dataset):
     def __init__(self, hf_dataset, transform=None):
         self.dataset = hf_dataset
         self.transform = transform
+        
+        # Cari nama kolom label secara dinamis
+        self.label_col = None
+        for col in ['label', 'text', 'word', 'label_text']:
+            if col in hf_dataset.column_names:
+                self.label_col = col
+                break
+        if not self.label_col:
+            for col in hf_dataset.column_names:
+                if col != 'image':
+                    self.label_col = col
+                    break
+        print(f"📌 Menggunakan kolom label: '{self.label_col}'")
 
     def __len__(self):
         return len(self.dataset)
 
     def __getitem__(self, idx):
         item = self.dataset[idx]
+        image = item['image'].convert('L')
         
-        # Pustaka HuggingFace mengembalikan kolom 'image' berupa PIL Image
-        image = item['image'].convert('L')  # Convert ke Grayscale
+        # Baca label secara dinamis
+        label_val = item[self.label_col]
         
-        # Label teks
-        # HuggingFace datasets memiliki kolom 'label' yang berupa ID kategori,
-        # kita convert ID kategori tersebut kembali menjadi nama teks obat/kata resep.
-        label_id = item['label']
-        label = self.dataset.features['label'].int2str(label_id)
+        # Cek jika kolom tersebut adalah ClassLabel atau string biasa
+        from datasets import ClassLabel
+        feature = self.dataset.features[self.label_col]
+        if isinstance(feature, ClassLabel):
+            label = feature.int2str(label_val)
+        else:
+            label = str(label_val)
         
         if self.transform:
             image = self.transform(image)
