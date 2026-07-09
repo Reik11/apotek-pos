@@ -27,6 +27,47 @@ export class OcrService implements OnModuleInit {
   }
 
   async scanPrescriptionImage(fileBuffer: Buffer): Promise<string> {
+    const hfToken = process.env.HF_TOKEN;
+
+    if (hfToken) {
+      this.logger.log(`🌐 Routing OCR request to Hugging Face Serverless Inference API...`);
+      try {
+        const response = await fetch(
+          'https://api-inference.huggingface.co/models/chinmays18/medical-prescription-ocr',
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${hfToken}`,
+              'Content-Type': 'image/jpeg',
+            },
+            body: fileBuffer,
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`HF Inference API returned status: ${response.statusText}`);
+        }
+
+        const data: any = await response.json();
+        
+        let rawText = '';
+        if (Array.isArray(data) && data.length > 0) {
+          rawText = data[0].generated_text || '';
+        } else if (data.generated_text) {
+          rawText = data.generated_text;
+        }
+
+        if (rawText) {
+          rawText = rawText.replace(/<s_prescription>/g, '').replace(/<\/s_prescription>/g, '').trim();
+          const parsedResult = this.parseDonutStructure(rawText);
+          this.logger.log(`✅ HF Serverless OCR Successful. Result length: ${parsedResult.length} chars`);
+          return parsedResult;
+        }
+      } catch (error: any) {
+        this.logger.error(`❌ HF Serverless OCR failed: ${error.message}. Falling back to local/dummy OCR.`);
+      }
+    }
+
     const hfSpaceUrl = process.env.HF_SPACE_URL;
 
     if (hfSpaceUrl) {
@@ -114,6 +155,55 @@ export class OcrService implements OnModuleInit {
       this.logger.warn('⚠️ Falling back to dummy mock prescription data.');
       return 'R/ Amoxicillin 500mg No. X\nS. 3 dd 1 tab pc\nR/ Paracetamol 500mg No. X\nS. prn 3 dd 1 tab pc';
     }
+  }
+
+  private cleanJsonOutput(prediction: string): string {
+    const cleaned = prediction.replace(/<[^>]+>/g, ' ');
+    return cleaned.replace(/\s+/g, ' ').trim();
+  }
+
+  private parseDonutStructure(prediction: string): string {
+    const drugs: string[] = [];
+    const dosages: string[] = [];
+    const frequencies: string[] = [];
+
+    const drugRegex = /<s_name>(.*?)<\/s_name>/g;
+    const dosageRegex = /<s_dosage>(.*?)<\/s_dosage>/g;
+    const freqRegex = /<s_frequency>(.*?)<\/s_frequency>/g;
+
+    let match;
+    const predictionClean = prediction;
+    
+    drugRegex.lastIndex = 0;
+    dosageRegex.lastIndex = 0;
+    freqRegex.lastIndex = 0;
+
+    while ((match = drugRegex.exec(predictionClean)) !== null) {
+      drugs.push(match[1].trim());
+    }
+    while ((match = dosageRegex.exec(predictionClean)) !== null) {
+      dosages.push(match[1].trim());
+    }
+    while ((match = freqRegex.exec(predictionClean)) !== null) {
+      frequencies.push(match[1].trim());
+    }
+
+    if (drugs.length > 0) {
+      const lines: string[] = [];
+      for (let i = 0; i < drugs.length; i++) {
+        const drug = drugs[i];
+        const dosage = i < dosages.length ? dosages[i] : '';
+        const freq = i < frequencies.length ? frequencies[i] : '';
+
+        let line = `R/ ${drug}`;
+        if (dosage) line += ` ${dosage}`;
+        if (freq) line += `\nS. ${freq}`;
+        lines.push(line);
+      }
+      return lines.join('\n');
+    }
+
+    return this.cleanJsonOutput(prediction);
   }
 }
 
