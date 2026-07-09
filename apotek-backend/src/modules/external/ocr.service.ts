@@ -10,6 +10,8 @@ const execAsync = promisify(exec);
 export class OcrService implements OnModuleInit {
   private readonly logger = new Logger(OcrService.name);
   private readonly scriptPath = 'D:\\!semester6\\!a\\apotek-pos\\ocr_training\\inference.py';
+  private readonly onnxScriptPath = 'D:\\!semester6\\!a\\apotek-pos\\ocr_training\\inference_onnx.py';
+  private readonly onnxModelPath = 'D:\\!semester6\\!a\\ocr_training\\ocr_prescription_model.onnx';
   private readonly tempDir = 'D:\\!semester6\\!a\\apotek-pos\\ocr_training\\temp';
 
   async onModuleInit() {
@@ -18,15 +20,60 @@ export class OcrService implements OnModuleInit {
       fs.mkdirSync(this.tempDir, { recursive: true });
     }
     
-    // Cek apakah script inference.py ada
-    if (fs.existsSync(this.scriptPath)) {
-      this.logger.log(`🤖 OCR Service initialized using HuggingFace Python script: ${this.scriptPath}`);
+    // Cek model ONNX
+    if (fs.existsSync(this.onnxModelPath)) {
+      this.logger.log(`🤖 OCR Service: Self-trained ONNX model detected at ${this.onnxModelPath}`);
     } else {
-      this.logger.error(`❌ Python inference script not found at: ${this.scriptPath}`);
+      this.logger.warn(`⚠️ OCR Service: Self-trained ONNX model not found yet at ${this.onnxModelPath}. Will use HuggingFace fallback.`);
     }
   }
 
   async scanPrescriptionImage(fileBuffer: Buffer): Promise<string> {
+    // 1. Prioritas Pertama: Model ONNX yang dilatih sendiri (jika file model dan script-nya ada)
+    if (fs.existsSync(this.onnxModelPath) && fs.existsSync(this.onnxScriptPath)) {
+      this.logger.log(`🤖 Using self-trained CRNN ONNX model for local OCR inference...`);
+      
+      const tempFileName = `rx_onnx_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.jpg`;
+      const tempFilePath = path.join(this.tempDir, tempFileName);
+
+      try {
+        await fs.promises.writeFile(tempFilePath, fileBuffer);
+        const command = `python "${this.onnxScriptPath}" "${tempFilePath}"`;
+        this.logger.log(`🚀 Executing local ONNX OCR command: ${command}`);
+
+        const { stdout, stderr } = await execAsync(command);
+
+        fs.unlink(tempFilePath, (err) => {
+          if (err) this.logger.error(`⚠️ Failed to delete temp file ${tempFilePath}: ${err.message}`);
+        });
+
+        if (stderr && stderr.includes('ERROR')) {
+          this.logger.error(`❌ Python ONNX OCR script reported error: ${stderr}`);
+          throw new Error(stderr);
+        }
+
+        const startMarker = '--- START OCR RESULT ---';
+        const endMarker = '--- END OCR RESULT ---';
+        
+        const startIndex = stdout.indexOf(startMarker);
+        const endIndex = stdout.indexOf(endMarker);
+
+        if (startIndex !== -1 && endIndex !== -1) {
+          const ocrResult = stdout.substring(startIndex + startMarker.length, endIndex).stripOrTrim();
+          this.logger.log(`✅ Local ONNX OCR Successful. Result length: ${ocrResult.length} chars`);
+          return ocrResult;
+        }
+
+        return stdout.trim();
+      } catch (error: any) {
+        if (fs.existsSync(tempFilePath)) {
+          try { fs.unlinkSync(tempFilePath); } catch (_) {}
+        }
+        this.logger.error(`❌ Local ONNX OCR failed: ${error.message}. Routing to Hugging Face fallback...`);
+      }
+    }
+
+    // 2. Prioritas Kedua: Hugging Face Serverless API (jika token diset)
     const hfToken = process.env.HF_TOKEN;
 
     if (hfToken) {
