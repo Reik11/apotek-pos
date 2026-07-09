@@ -74,7 +74,7 @@ export class OcrService implements OnModuleInit {
       this.logger.log(`🌐 Routing OCR request to Hugging Face Space API: ${hfSpaceUrl}`);
       try {
         const formData = new FormData();
-        const blob = new Blob([fileBuffer], { type: 'image/jpeg' });
+        const blob = new Blob([fileBuffer as any], { type: 'image/jpeg' });
         formData.append('file', blob, 'prescription.jpg');
 
         const response = await fetch(`${hfSpaceUrl.replace(/\/$/, '')}/predict`, {
