@@ -112,7 +112,7 @@ class _OcrScreenState extends ConsumerState<OcrScreen> {
         data: formData,
       );
 
-      final String detectedText = response.data['text'] ?? '';
+      final String detectedText = response.data['rawText'] ?? '';
       
       setState(() {
         _ocrText = detectedText;

@@ -87,6 +87,7 @@ class _PasienHomeScreenState extends ConsumerState<PasienHomeScreen> {
           isLoadingHome = false;
         });
         _updateShippingFee();
+        await _checkFirstTimeProfileFill();
       }
     } catch (e) {
       if (mounted) setState(() => isLoadingHome = false);
