@@ -19,7 +19,7 @@ NUM_CLASSES = len(CHARACTERS) + 1  # Characters + 1 Blank
 IMAGE_WIDTH = 256
 IMAGE_HEIGHT = 64
 BATCH_SIZE = 32
-EPOCHS = 150
+EPOCHS = 300
 LEARNING_RATE = 0.001
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
