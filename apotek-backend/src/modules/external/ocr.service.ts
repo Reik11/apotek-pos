@@ -2,7 +2,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as ort from 'onnxruntime-node';
-import * as sharp from 'sharp';
+import sharp from 'sharp';
 
 @Injectable()
 export class OcrService implements OnModuleInit {
