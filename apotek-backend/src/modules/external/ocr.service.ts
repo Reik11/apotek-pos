@@ -149,7 +149,7 @@ export class OcrService implements OnModuleInit {
 
     // Daftar obat di dataset Kaggle asli Anda
     const knownDrugs = [
-      'azitma', 'cefiget', 'novidat', 'lipiget', 'starcox', 
+      'azitoma', 'cefiget', 'novidat', 'lipiget', 'starcox', 
       'leflox', 'toniflex', 'breaky', 'provas', 'caricef', 
       'bisleri', 'distalgesic', 'atcomid', 'atconate', 'mesulid', 
       'movelate', 'uriguard', 'atcam', 'ostium', 'getryl', 
