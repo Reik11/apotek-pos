@@ -10,6 +10,7 @@ import { FdaService } from './fda.service';
 import { DrugSyncService } from './drug-sync.service';
 import { OcrService } from './ocr.service';
 import { Body } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Controller('external')
 @UseGuards(AuthGuard('jwt'))
@@ -19,6 +20,7 @@ export class ExternalController {
     private fdaService: FdaService,
     private drugSyncService: DrugSyncService,
     private ocrService: OcrService,
+    private prisma: PrismaService,
   ) {}
 
   // Cari obat di RxNorm
@@ -84,12 +86,31 @@ export class ExternalController {
 
     for (const line of lines.slice(0, 10)) {
       try {
-        const results = await this.rxNormService.searchByName(line);
-        if (results.length > 0) {
+        const cleanLine = line.replace(/^[rR]\/\s*/, '').trim();
+        if (/^[sS]\.\s*/.test(cleanLine) || cleanLine.length <= 2) {
+          continue;
+        }
+
+        const [rxnormResults, localDrugs] = await Promise.all([
+          this.rxNormService.searchByName(cleanLine),
+          this.prisma.drug.findMany({
+            where: {
+              isActive: true,
+              OR: [
+                { name: { contains: cleanLine, mode: 'insensitive' } },
+                { genericName: { contains: cleanLine, mode: 'insensitive' } },
+                { activeIngredient: { contains: cleanLine, mode: 'insensitive' } },
+              ],
+            },
+            take: 5,
+          }),
+        ]);
+
+        if (rxnormResults.length > 0 || localDrugs.length > 0) {
           drugs.push({
-            detectedName: line,
-            rxnorm: results[0],
-            localDrugs: [],
+            detectedName: cleanLine,
+            rxnorm: rxnormResults[0] || null,
+            localDrugs,
           });
         }
       } catch (e) {
@@ -147,12 +168,31 @@ export class ExternalController {
 
     for (const line of lines.slice(0, 10)) {
       try {
-        const results = await this.rxNormService.searchByName(line);
-        if (results.length > 0) {
+        const cleanLine = line.replace(/^[rR]\/\s*/, '').trim();
+        if (/^[sS]\.\s*/.test(cleanLine) || cleanLine.length <= 2) {
+          continue;
+        }
+
+        const [rxnormResults, localDrugs] = await Promise.all([
+          this.rxNormService.searchByName(cleanLine),
+          this.prisma.drug.findMany({
+            where: {
+              isActive: true,
+              OR: [
+                { name: { contains: cleanLine, mode: 'insensitive' } },
+                { genericName: { contains: cleanLine, mode: 'insensitive' } },
+                { activeIngredient: { contains: cleanLine, mode: 'insensitive' } },
+              ],
+            },
+            take: 5,
+          }),
+        ]);
+
+        if (rxnormResults.length > 0 || localDrugs.length > 0) {
           drugs.push({
-            detectedName: line,
-            rxnorm: results[0],
-            localDrugs: [],
+            detectedName: cleanLine,
+            rxnorm: rxnormResults[0] || null,
+            localDrugs,
           });
         }
       } catch (e) {
@@ -191,12 +231,31 @@ export class ExternalController {
 
       for (const line of lines.slice(0, 10)) {
         try {
-          const results = await this.rxNormService.searchByName(line);
-          if (results.length > 0) {
+          const cleanLine = line.replace(/^[rR]\/\s*/, '').trim();
+          if (/^[sS]\.\s*/.test(cleanLine) || cleanLine.length <= 2) {
+            continue;
+          }
+
+          const [rxnormResults, localDrugs] = await Promise.all([
+            this.rxNormService.searchByName(cleanLine),
+            this.prisma.drug.findMany({
+              where: {
+                isActive: true,
+                OR: [
+                  { name: { contains: cleanLine, mode: 'insensitive' } },
+                  { genericName: { contains: cleanLine, mode: 'insensitive' } },
+                  { activeIngredient: { contains: cleanLine, mode: 'insensitive' } },
+                ],
+              },
+              take: 5,
+            }),
+          ]);
+
+          if (rxnormResults.length > 0 || localDrugs.length > 0) {
             drugs.push({
-              detectedName: line,
-              rxnorm: results[0],
-              localDrugs: [],
+              detectedName: cleanLine,
+              rxnorm: rxnormResults[0] || null,
+              localDrugs,
             });
           }
         } catch (e) {
