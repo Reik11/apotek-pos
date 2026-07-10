@@ -129,13 +129,69 @@ export class OcrService implements OnModuleInit {
       }
 
       const decodedText = decodedTextArr.join('').trim();
-      this.logger.log(`✅ Native ONNX OCR Successful. Decoded text: "${decodedText}"`);
+      this.logger.log(`✅ Native ONNX OCR Successful. Raw decoded text: "${decodedText}"`);
 
-      return `R/ ${decodedText}\nS. 3 dd 1 tab`;
+      // Terapkan auto-koreksi ejaan menggunakan jarak Levenshtein ke nama obat terdekat
+      const correctedText = this.getClosestMatch(decodedText);
+      this.logger.log(`✏️ Auto-corrected OCR text: "${correctedText}"`);
+
+      return `R/ ${correctedText}\nS. 3 dd 1 tab`;
     } catch (error: any) {
       this.logger.error(`❌ Native ONNX OCR execution failed: ${error.message}`);
       this.logger.warn('⚠️ Falling back to dummy mock prescription data.');
       return 'R/ Amoxicillin 500mg No. X\nS. 3 dd 1 tab pc\nR/ Paracetamol 500mg No. X\nS. prn 3 dd 1 tab pc';
     }
+  }
+
+  private getClosestMatch(decodedText: string): string {
+    const text = decodedText.toLowerCase().trim();
+    if (!text) return '';
+
+    // Daftar obat di dataset Kaggle asli Anda
+    const knownDrugs = [
+      'azitma', 'cefiget', 'novidat', 'lipiget', 'starcox', 
+      'leflox', 'toniflex', 'breaky', 'provas', 'caricef', 
+      'bisleri', 'distalgesic', 'atcomid', 'atconate', 'mesulid', 
+      'movelate', 'uriguard', 'atcam', 'ostium', 'getryl', 
+      'covam', 'fexet', 'amoxicillin', 'paracetamol'
+    ];
+
+    let closest = decodedText;
+    let minDistance = Infinity;
+
+    for (const drug of knownDrugs) {
+      const distance = this.levenshtein(text, drug);
+      // Jika jarak sangat dekat (misal hanya 1 atau 2 huruf beda/salah ketik)
+      if (distance < minDistance && distance <= 2) {
+        minDistance = distance;
+        closest = drug;
+      }
+    }
+
+    // Format dengan huruf kapital di awal kata (Capitalize)
+    return closest.charAt(0).toUpperCase() + closest.slice(1);
+  }
+
+  private levenshtein(a: string, b: string): number {
+    const matrix: number[][] = [];
+    for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+    for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+
+    for (let i = 1; i <= b.length; i++) {
+      for (let j = 1; j <= a.length; j++) {
+        if (b.charAt(i - 1) === a.charAt(j - 1)) {
+          matrix[i][j] = matrix[i - 1][j - 1];
+        } else {
+          matrix[i][j] = Math.min(
+            matrix[i - 1][j - 1] + 1, // substitution
+            Math.min(
+              matrix[i][j - 1] + 1,   // insertion
+              matrix[i - 1][j] + 1    // deletion
+            )
+          );
+        }
+      }
+    }
+    return matrix[b.length][a.length];
   }
 }
