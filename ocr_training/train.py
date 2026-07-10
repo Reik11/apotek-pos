@@ -234,8 +234,8 @@ def train(img_dir, csv_path, output_model_path):
     print("[INFO] Model ONNX berhasil disimpan! Anda dapat menaruh file ini di backend NestJS.")
 
 if __name__ == "__main__":
-    # Path dataset Kaggle tulisan tangan resep dokter asli
-    real_data_dir = "D:\\!semester6\\!a\\ocr_training\\kaggle_data\\doctor-handwriting-recognition-dataset\\img"
+    # Path dataset Kaggle tulisan tangan resep dokter asli (dengan folder img terdalam)
+    real_data_dir = "D:\\!semester6\\!a\\ocr_training\\kaggle_data\\doctor-handwriting-recognition-dataset\\img\\img"
     real_csv_path = "D:\\!semester6\\!a\\ocr_training\\kaggle_data\\doctor-handwriting-recognition-dataset\\doctor_handwriting_labels.csv"
     output_onnx_path = "D:\\!semester6\\!a\\ocr_training\\ocr_prescription_model.onnx"
     
