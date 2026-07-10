@@ -381,6 +381,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                             email: _emailController.text.trim(),
                                           );
                                       if (success && mounted) {
+                                        final currentUser = ref.read(authProvider).user;
+                                        if (currentUser != null) {
+                                          ref.read(authProvider.notifier).refreshUser({
+                                            'id': currentUser.id,
+                                            'name': _nameController.text.trim(),
+                                            'email': _emailController.text.trim(),
+                                            'role': currentUser.role,
+                                            'outletId': currentUser.outletId,
+                                            'avatarUrl': currentUser.avatarUrl,
+                                          });
+                                        }
                                         ScaffoldMessenger.of(context)
                                             .showSnackBar(
                                           const SnackBar(
