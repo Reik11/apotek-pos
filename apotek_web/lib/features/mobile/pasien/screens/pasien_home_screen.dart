@@ -2381,8 +2381,11 @@ class _PasienHomeScreenState extends ConsumerState<PasienHomeScreen> {
     );
   }
 
+  bool _isProfileDialogOpen = false;
+
   // Cek pengisian profil medis pertama kali (pop-up isi data diri)
   Future<void> _checkFirstTimeProfileFill() async {
+    if (_isProfileDialogOpen) return;
     try {
       final res = await ApiClient.createDio().get('/users/medical-profile');
       final medicalData = Map<String, dynamic>.from(res.data as Map);
@@ -2392,6 +2395,10 @@ class _PasienHomeScreenState extends ConsumerState<PasienHomeScreen> {
       
       if (weight == null || height == null || (weight as num) == 0 || (height as num) == 0) {
         if (!mounted) return;
+        
+        setState(() {
+          _isProfileDialogOpen = true;
+        });
         
         await showDialog(
           context: context,
@@ -2411,7 +2418,9 @@ class _PasienHomeScreenState extends ConsumerState<PasienHomeScreen> {
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(ctx),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                },
                 child: const Text('Nanti Saja', style: TextStyle(color: Colors.grey)),
               ),
               ElevatedButton(
@@ -2430,6 +2439,12 @@ class _PasienHomeScreenState extends ConsumerState<PasienHomeScreen> {
             ],
           ),
         );
+
+        if (mounted) {
+          setState(() {
+            _isProfileDialogOpen = false;
+          });
+        }
       }
     } catch (_) {
       // Abaikan jika API gagal
