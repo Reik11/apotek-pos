@@ -191,6 +191,9 @@ def train(img_dir, csv_path, output_model_path):
             # Forward pass
             outputs = model(images) # Shape: [Sequence_Length, Batch, Num_Classes]
             
+            # Terapkan log_softmax pada dimensi kelas (dim 2) sesuai spesifikasi nn.CTCLoss
+            log_probs = outputs.log_softmax(2)
+            
             # Ukuran sequence panjang input (W_new dari CNN)
             input_lengths = torch.full(size=(images.size(0),), fill_value=outputs.size(0), dtype=torch.long).to(DEVICE)
             
@@ -198,7 +201,7 @@ def train(img_dir, csv_path, output_model_path):
             # CTC Loss membutuhkan format target 1D datar (flat)
             flat_targets = torch.cat([targets[i, :target_lengths[i]] for i in range(targets.size(0))])
             
-            loss = criterion(outputs, flat_targets, input_lengths, target_lengths)
+            loss = criterion(log_probs, flat_targets, input_lengths, target_lengths)
             loss.backward()
             
             optimizer.step()
