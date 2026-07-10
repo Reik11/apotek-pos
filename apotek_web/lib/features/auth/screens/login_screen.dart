@@ -180,13 +180,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           width: 64,
                           height: 64,
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.15),
+                            color: Colors.white,
                             borderRadius: BorderRadius.circular(18),
                           ),
-                          child: const Icon(
-                            Icons.local_pharmacy_rounded,
-                            color: Colors.white,
-                            size: 36,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(18),
+                            child: Image.asset(
+                              'assets/images/logo.png',
+                              fit: BoxFit.cover,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 32),
@@ -244,13 +246,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             width: 72,
             height: 72,
             decoration: BoxDecoration(
-              gradient: AppTheme.primaryGradient,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: const Icon(
-              Icons.local_pharmacy_rounded,
               color: Colors.white,
-              size: 40,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: Image.asset(
+                'assets/images/logo.png',
+                fit: BoxFit.cover,
+              ),
             ),
           ),
           const SizedBox(height: 16),

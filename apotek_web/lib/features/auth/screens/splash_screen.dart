@@ -159,11 +159,11 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                           ),
                         ],
                       ),
-                      child: const Center(
-                        child: Icon(
-                          Icons.local_pharmacy_rounded,
-                          color: AppTheme.primary,
-                          size: 52,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(24),
+                        child: Image.asset(
+                          'assets/images/logo.png',
+                          fit: BoxFit.cover,
                         ),
                       ),
                     ),
