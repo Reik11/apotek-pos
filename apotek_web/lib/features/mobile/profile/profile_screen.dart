@@ -389,7 +389,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                             'email': _emailController.text.trim(),
                                             'role': currentUser.role,
                                             'outletId': currentUser.outletId,
-                                            'avatarUrl': currentUser.avatarUrl,
                                           });
                                         }
                                         ScaffoldMessenger.of(context)
