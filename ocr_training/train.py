@@ -234,23 +234,14 @@ def train(img_dir, csv_path, output_model_path):
     print("[INFO] Model ONNX berhasil disimpan! Anda dapat menaruh file ini di backend NestJS.")
 
 if __name__ == "__main__":
-    # Menjalankan pengetesan training script menggunakan dummy folder (atau folder resep jika sudah ada)
-    data_dir = "D:\\!semester6\\!a\\resep_images_dummy"
-    os.makedirs(data_dir, exist_ok=True)
+    # Path dataset Kaggle tulisan tangan resep dokter asli
+    real_data_dir = "D:\\!semester6\\!a\\ocr_training\\kaggle_data\\doctor-handwriting-recognition-dataset\\img"
+    real_csv_path = "D:\\!semester6\\!a\\ocr_training\\kaggle_data\\doctor-handwriting-recognition-dataset\\doctor_handwriting_labels.csv"
+    output_onnx_path = "D:\\!semester6\\!a\\ocr_training\\ocr_prescription_model.onnx"
     
-    # Membuat 2 gambar dummy grayscale untuk test script agar tidak error saat pertama kali dijalankan
-    img = Image.fromarray(np.uint8(np.random.rand(100, 300) * 255))
-    img.save(os.path.join(data_dir, "amox.png"))
-    img2 = Image.fromarray(np.uint8(np.random.rand(100, 300) * 255))
-    img2.save(os.path.join(data_dir, "pct.png"))
-    
-    csv_dummy = os.path.join(data_dir, "labels.csv")
-    with open(csv_dummy, 'w') as f:
-        f.write("image_path,text_label\namox.png,Amoxicillin\npct.png,Paracetamol\n")
-        
     # Jalankan training & ekspor ke ONNX
     train(
-        img_dir=data_dir,
-        csv_path=csv_dummy,
-        output_model_path="D:\\!semester6\\!a\\ocr_training\\ocr_prescription_model.onnx"
+        img_dir=real_data_dir,
+        csv_path=real_csv_path,
+        output_model_path=output_onnx_path
     )
