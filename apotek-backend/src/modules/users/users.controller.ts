@@ -11,46 +11,6 @@ import { UsersService } from './users.service';
 export class UsersController {
   constructor(private usersService: UsersService) {}
 
-  // ==== ADMIN ENDPOINTS ====
-
-  @Get()
-  findAll(@Request() req: any) {
-    return this.usersService.findAll(req.user.role, req.user.outletId);
-  }
-
-  @Post()
-  create(@Request() req: any, @Body() body: any) {
-    const outletId = req.user.role === 'SUPER_ADMIN' ? body.outletId : req.user.outletId;
-    return this.usersService.create({
-      name: body.name,
-      email: body.email,
-      password: body.password,
-      role: body.role,
-      phone: body.phone,
-      shift: body.shift,
-      outletId,
-    });
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string, @Request() req: any) {
-    return this.usersService.remove(id, req.user.id);
-  }
-
-  @Put(':id')
-  update(@Param('id') id: string, @Request() req: any, @Body() body: any) {
-    const outletId = req.user.role === 'SUPER_ADMIN' ? body.outletId : req.user.outletId;
-    return this.usersService.update(id, {
-      name: body.name,
-      email: body.email,
-      role: body.role,
-      phone: body.phone,
-      shift: body.shift,
-      isActive: body.isActive,
-      outletId,
-    });
-  }
-
   // ==== USER SELF ENDPOINTS ====
 
   @Put('profile')
@@ -89,5 +49,45 @@ export class UsersController {
       body.newPassword,
       body.otp,
     );
+  }
+
+  // ==== ADMIN ENDPOINTS ====
+
+  @Get()
+  findAll(@Request() req: any) {
+    return this.usersService.findAll(req.user.role, req.user.outletId);
+  }
+
+  @Post()
+  create(@Request() req: any, @Body() body: any) {
+    const outletId = req.user.role === 'SUPER_ADMIN' ? body.outletId : req.user.outletId;
+    return this.usersService.create({
+      name: body.name,
+      email: body.email,
+      password: body.password,
+      role: body.role,
+      phone: body.phone,
+      shift: body.shift,
+      outletId,
+    });
+  }
+
+  @Delete(':id')
+  remove(@Param('id') id: string, @Request() req: any) {
+    return this.usersService.remove(id, req.user.id);
+  }
+
+  @Put(':id')
+  update(@Param('id') id: string, @Request() req: any, @Body() body: any) {
+    const outletId = req.user.role === 'SUPER_ADMIN' ? body.outletId : req.user.outletId;
+    return this.usersService.update(id, {
+      name: body.name,
+      email: body.email,
+      role: body.role,
+      phone: body.phone,
+      shift: body.shift,
+      isActive: body.isActive,
+      outletId,
+    });
   }
 }
