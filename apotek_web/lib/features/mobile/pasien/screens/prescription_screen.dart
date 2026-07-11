@@ -142,11 +142,11 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
     });
 
     try {
+      final token = ref.read(authProvider).token;
+      final dioClient = ApiClient.createDio(token: token);
+      final dio.FormData formData = dio.FormData();
+
       if (kIsWeb) {
-        final token = ref.read(authProvider).token;
-        final dioClient = ApiClient.createDio(token: token);
-        final dio.FormData formData = dio.FormData();
-        
         formData.files.add(MapEntry(
           'file',
           dio.MultipartFile.fromBytes(
@@ -154,57 +154,39 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
             filename: _webImageName ?? 'prescription.jpg',
           ),
         ));
-
-        final response = await dioClient.post(
-          '/external/ocr-prescription',
-          data: formData,
-        );
-
-        final String detectedText = response.data['rawText'] ?? '';
-        setState(() {
-          _ocrText = detectedText;
-        });
-
-        if (detectedText.trim().isEmpty) {
-          setState(() => _isOcrProcessing = false);
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Foto kurang jelas. Google ML Kit tidak dapat mengenali tulisan resep.'),
-                backgroundColor: AppTheme.warning,
-              ),
-            );
-          }
-          return;
-        }
-
-        await _analyzeDrugsOcr(detectedText);
       } else {
-        final inputImage = InputImage.fromFilePath(_selectedImage!.path);
-        final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
-        final RecognizedText recognizedText = await textRecognizer.processImage(inputImage);
-        
-        await textRecognizer.close();
+        formData.files.add(MapEntry(
+          'file',
+          await dio.MultipartFile.fromFile(
+            _selectedImage!.path,
+            filename: 'prescription.jpg',
+          ),
+        ));
+      }
 
-        final String detectedText = recognizedText.text;
-        setState(() {
-          _ocrText = detectedText;
-        });
+      final response = await dioClient.post(
+        '/external/ocr-prescription',
+        data: formData,
+      );
 
-        if (detectedText.trim().isEmpty) {
-          setState(() => _isOcrProcessing = false);
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Gagal mendeteksi tulisan resep. Pastikan foto tulisan cukup terang, tidak blur, dan terbaca jelas.'),
-                backgroundColor: AppTheme.warning,
-              ),
-            );
-          }
-          return;
+      final String detectedText = response.data['rawText'] ?? '';
+      final List drugsList = response.data['drugs'] is List ? response.data['drugs'] : [];
+
+      setState(() {
+        _ocrText = detectedText;
+        _detectedDrugs = List<Map<String, dynamic>>.from(drugsList);
+        _isOcrProcessing = false;
+      });
+
+      if (detectedText.trim().isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Model latih tidak dapat mengenali tulisan pada gambar resep ini. Harap gunakan foto cetak atau tulis tangan yang rapi.'),
+              backgroundColor: AppTheme.warning,
+            ),
+          );
         }
-
-        await _analyzeDrugsOcr(detectedText);
       }
     } catch (e) {
       setState(() => _isOcrProcessing = false);
