@@ -165,6 +165,19 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
           _ocrText = detectedText;
         });
 
+        if (detectedText.trim().isEmpty) {
+          setState(() => _isOcrProcessing = false);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Foto kurang jelas. Google ML Kit tidak dapat mengenali tulisan resep.'),
+                backgroundColor: AppTheme.warning,
+              ),
+            );
+          }
+          return;
+        }
+
         await _analyzeDrugsOcr(detectedText);
       } else {
         final inputImage = InputImage.fromFilePath(_selectedImage!.path);
@@ -180,6 +193,14 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
 
         if (detectedText.trim().isEmpty) {
           setState(() => _isOcrProcessing = false);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Gagal mendeteksi tulisan resep. Pastikan foto tulisan cukup terang, tidak blur, dan terbaca jelas.'),
+                backgroundColor: AppTheme.warning,
+              ),
+            );
+          }
           return;
         }
 
