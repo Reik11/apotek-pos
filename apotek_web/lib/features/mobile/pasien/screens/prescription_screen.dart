@@ -259,25 +259,81 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
             Text('Informasi Kandungan Obat'),
           ],
         ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Hasil scan ini hanya digunakan untuk pencarian informasi kandungan obat (tidak diajukan ke Apoteker).',
-                style: TextStyle(fontSize: 13),
-              ),
-              const SizedBox(height: 12),
-              ..._detectedDrugs.map((drug) {
-                final name = drug['detectedName'] ?? '-';
-                final rxnormName = drug['rxnorm']?['name'] ?? 'Kandungan umum';
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Text('• $name ($rxnormName)', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                );
-              }).toList(),
-            ],
+        content: SizedBox(
+          width: MediaQuery.of(context).size.width * 0.9,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Hasil scan ini hanya digunakan untuk pencarian informasi kandungan obat (tidak diajukan ke Apoteker).',
+                  style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+                ),
+                const SizedBox(height: 16),
+                ..._detectedDrugs.map((drug) {
+                  final name = drug['detectedName'] ?? '-';
+                  final localDrugs = drug['localDrugs'] as List? ?? [];
+                  final localDrug = localDrugs.isNotEmpty ? localDrugs.first : null;
+                  
+                  final genericName = localDrug?['genericName'] ?? localDrug?['activeIngredient'] ?? drug['rxnorm']?['name'] ?? 'Kandungan Umum';
+                  final category = localDrug?['category'] ?? 'BEBAS';
+                  final type = localDrug?['type'] ?? 'GENERIK';
+                  
+                  final fdaIndications = localDrug?['fdaIndications'] ?? localDrug?['description'] ?? 'Informasi kegunaan klinis belum disinkronkan.';
+                  final fdaSideEffects = localDrug?['fdaSideEffects'] ?? 'Tidak ada efek samping klinis utama yang dilaporkan.';
+                  final fdaDosage = localDrug?['fdaDosage'] ?? 'Dosis harus mengikuti instruksi dokter.';
+                  final fdaWarnings = localDrug?['fdaWarnings'] ?? 'Gunakan obat sesuai petunjuk.';
+
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    elevation: 0,
+                    color: Colors.grey.shade50,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(color: Colors.grey.shade200),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Nama Obat & Icon
+                          Row(
+                            children: [
+                              const Icon(Icons.medication, color: AppTheme.primary, size: 20),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  name,
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppTheme.primary),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          
+                          // Informasi Kandungan & Golongan
+                          _buildInfoRow('Kandungan Aktif:', genericName, isBoldValue: true),
+                          _buildInfoRow('Golongan / Tipe:', '$category / $type'),
+                          
+                          const Divider(height: 16),
+                          
+                          // Detail Medis Resmi FDA & Scraping
+                          _buildMedicalSection('Kegunaan Utama / Indikasi:', fdaIndications, AppTheme.success),
+                          const SizedBox(height: 8),
+                          _buildMedicalSection('Aturan Dosis & Cara Kerja:', fdaDosage, AppTheme.primary),
+                          const SizedBox(height: 8),
+                          _buildMedicalSection('Efek Samping:', fdaSideEffects, AppTheme.danger),
+                          const SizedBox(height: 8),
+                          _buildMedicalSection('Informasi Penting Penggunaan:', fdaWarnings, AppTheme.warning),
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ],
+            ),
           ),
         ),
         actions: [
@@ -297,6 +353,55 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value, {bool isBoldValue = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 110,
+            child: Text(
+              label,
+              style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w500),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 12,
+                color: AppTheme.textPrimary,
+                fontWeight: isBoldValue ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMedicalSection(String title, String content, Color accentColor) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 11,
+            color: accentColor,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          content,
+          style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+        ),
+      ],
     );
   }
 
