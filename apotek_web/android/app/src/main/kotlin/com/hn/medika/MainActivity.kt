@@ -1,4 +1,4 @@
-package com.example.apotek_web
+package com.hn.medika
 
 import io.flutter.embedding.android.FlutterActivity
 
