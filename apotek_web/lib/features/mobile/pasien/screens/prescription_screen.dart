@@ -1045,7 +1045,11 @@ class _PrescriptionDrugResultCardState extends State<_PrescriptionDrugResultCard
   @override
   void initState() {
     super.initState();
-    _loadFdaInfo();
+    // Only load FDA info if local drugs is empty to avoid unnecessary token issues
+    final localDrugs = widget.drug['localDrugs'] as List? ?? [];
+    if (localDrugs.isEmpty) {
+      _loadFdaInfo();
+    }
   }
 
   Future<void> _loadFdaInfo() async {
@@ -1053,7 +1057,9 @@ class _PrescriptionDrugResultCardState extends State<_PrescriptionDrugResultCard
       final name = widget.drug['detectedName'] ?? '';
       final response =
           await ApiClient.createDio().get('/external/fda/label?name=$name');
-      setState(() => _fdaInfo = response.data);
+      if (response.data is Map) {
+        setState(() => _fdaInfo = Map<String, dynamic>.from(response.data as Map));
+      }
     } catch (e) {
       // FDA info tidak tersedia
     }
@@ -1214,7 +1220,7 @@ class _PrescriptionDrugResultCardState extends State<_PrescriptionDrugResultCard
           ],
 
           // Info FDA (Jika tidak ada info lokal, tampilkan info FDA sebagai cadangan)
-          if (localDrug == null && _fdaInfo != null) ...[
+          if (localDrug == null && _fdaInfo != null && _fdaInfo is Map) ...[
             const Divider(height: 1),
             Padding(
               padding: const EdgeInsets.all(12),
@@ -1261,80 +1267,83 @@ class _PrescriptionDrugResultCardState extends State<_PrescriptionDrugResultCard
             ),
           ],
 
-            // Tersedia di apotek ini
-            if (localDrugs.isNotEmpty) ...[
-              const Divider(height: 1),
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      '✅ Tersedia di Apotek Ini:',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                        color: AppTheme.success,
-                      ),
+          // Tersedia di apotek ini
+          if (localDrugs.isNotEmpty) ...[
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '✅ Tersedia di Apotek Ini:',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      color: AppTheme.success,
                     ),
-                    const SizedBox(height: 8),
-                    ...localDrugs.take(3).map((d) => Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                  ),
+                  const SizedBox(height: 8),
+                  ...localDrugs.take(3).map((d) {
+                    if (d is! Map) return const SizedBox.shrink();
+                    final dMap = Map<String, dynamic>.from(d as Map);
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  dMap['name']?.toString() ?? '-',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                Row(
                                   children: [
-                                    Text(
-                                      d['name'],
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                    Row(
-                                      children: [
-                                        _PrescriptionTypeBadge(type: d['type']),
-                                        const SizedBox(width: 4),
-                                        _PrescriptionCategoryBadge(category: d['category']),
-                                      ],
-                                    ),
+                                    _PrescriptionTypeBadge(type: dMap['type']?.toString() ?? 'GENERIK'),
+                                    const SizedBox(width: 4),
+                                    _PrescriptionCategoryBadge(category: dMap['category']?.toString() ?? 'BEBAS'),
                                   ],
                                 ),
-                              ),
-                              Text(
-                                widget.currency.format(d['sellPrice']),
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: AppTheme.primary,
-                                ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        )),
-                  ],
-                ),
-              ),
-            ] else
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: Row(
-                  children: [
-                    const Icon(Icons.info_outline,
-                        color: AppTheme.warning, size: 16),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'Obat tidak tersedia di apotek ini',
-                      style: TextStyle(
-                        color: AppTheme.warning,
-                        fontSize: 13,
+                          Text(
+                            widget.currency.format(dMap['sellPrice'] is num ? dMap['sellPrice'] : (double.tryParse(dMap['sellPrice']?.toString() ?? '') ?? 0.0)),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.primary,
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
-                ),
+                    );
+                  }),
+                ],
               ),
-          ],
+            ),
+          ] else
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline,
+                      color: AppTheme.warning, size: 16),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Obat tidak tersedia di apotek ini',
+                    style: TextStyle(
+                      color: AppTheme.warning,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );
