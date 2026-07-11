@@ -521,7 +521,7 @@ packages:
     source: hosted
     version: "0.8.1"
   google_mlkit_text_recognition:
-    dependency: "direct dev"
+    dependency: "direct main"
     description:
       name: google_mlkit_text_recognition
       sha256: "179349417066fa2c275d7a6ed6cbceeb7fa265d73aacdb2d732f1a2991face0a"
@@ -617,7 +617,7 @@ packages:
     source: hosted
     version: "4.8.0"
   image_picker:
-    dependency: "direct dev"
+    dependency: "direct main"
     description:
       name: image_picker
       sha256: "91c025426c2881c551100bce834e201c835a170151545f58d17da5180ca7d9ac"
@@ -905,7 +905,7 @@ packages:
     source: hosted
     version: "1.0.4"
   permission_handler:
-    dependency: "direct dev"
+    dependency: "direct main"
     description:
       name: permission_handler
       sha256: "59adad729136f01ea9e35a48f5d1395e25cba6cea552249ddbe9cf950f5d7849"
