@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Penghapusan Akun & Data - Medika</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            color: #333;
+            background-color: #f9f9f9;
+        }
+        .container {
+            max-width: 600px;
+            margin: 40px auto;
+            padding: 40px;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+        }
+        h1 {
+            color: #ef4444;
+            font-size: 26px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 10px;
+        }
+        p {
+            font-size: 15px;
+            color: #475569;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #1e293b;
+        }
+        input[type="email"], textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-size: 14px;
+        }
+        input[type="email"]:focus, textarea:focus {
+            outline: none;
+            border-color: #ef4444;
+            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+        }
+        button {
+            background-color: #ef4444;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            width: 100%;
+            transition: background-color 0.2s;
+        }
+        button:hover {
+            background-color: #dc2626;
+        }
+        .success-message {
+            display: none;
+            background-color: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            color: #16a34a;
+            padding: 16px;
+            border-radius: 6px;
+            text-align: center;
+            font-weight: 600;
+            margin-top: 20px;
+        }
+        .info-box {
+            background-color: #f8fafc;
+            border-left: 4px solid #94a3b8;
+            padding: 12px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            color: #64748b;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Permintaan Penghapusan Akun Medika</h1>
+        <p>Jika Anda memutuskan untuk berhenti menggunakan aplikasi Medika, Anda dapat mengajukan permintaan penghapusan akun Anda beserta seluruh data pribadi terkait (nama, email, transaksi, dan riwayat resep) secara permanen dari sistem kami.</p>
+        
+        <div class="info-box">
+            <strong>Penting:</strong> Proses penghapusan data bersifat permanen dan tidak dapat dibatalkan. Setelah akun dihapus, Anda tidak akan dapat login kembali atau memulihkan riwayat transaksi Anda.
+        </div>
+
+        <form id="deleteForm" onsubmit="handleSubmit(event)">
+            <div class="form-group">
+                <label for="email">Alamat Email Terdaftar:</label>
+                <input type="email" id="email" required placeholder="Masukkan email akun Medika Anda">
+            </div>
+            <div class="form-group">
+                <label for="reason">Alasan Penghapusan (Opsional):</label>
+                <textarea id="reason" rows="3" placeholder="Beri tahu kami alasan Anda menghapus akun..."></textarea>
+            </div>
+            <button type="submit">Hapus Akun & Data Saya Permanen</button>
+        </form>
+
+        <div id="successMessage" class="success-message">
+            ✓ Permintaan Anda telah terkirim! Tim support kami akan memverifikasi dan menghapus seluruh data Anda dalam waktu maksimal 3x24 jam. Konfirmasi penghapusan akan dikirimkan ke email Anda.
+        </div>
+    </div>
+
+    <script>
+        function handleSubmit(event) {
+            event.preventDefault();
+            
+            // Simulasikan pengiriman form sukses (bisa juga dihubungkan ke API backend nanti)
+            document.getElementById('deleteForm').style.display = 'none';
+            document.getElementById('successMessage').style.display = 'block';
+        }
+    </script>
+</body>
+</html>
