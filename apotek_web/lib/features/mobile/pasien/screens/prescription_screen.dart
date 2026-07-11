@@ -1064,6 +1064,16 @@ class _PrescriptionDrugResultCardState extends State<_PrescriptionDrugResultCard
     final localDrugs = widget.drug['localDrugs'] as List? ?? [];
     final rxnorm = widget.drug['rxnorm'] as Map? ?? {};
 
+    // Safely parse the local drug map to prevent dynamic cast errors
+    Map<String, dynamic>? localDrug;
+    if (localDrugs.isNotEmpty && localDrugs.first is Map) {
+      try {
+        localDrug = Map<String, dynamic>.from(localDrugs.first as Map);
+      } catch (e) {
+        localDrug = null;
+      }
+    }
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -1097,7 +1107,7 @@ class _PrescriptionDrugResultCardState extends State<_PrescriptionDrugResultCard
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        widget.drug['detectedName'] ?? '-',
+                        widget.drug['detectedName']?.toString() ?? '-',
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
@@ -1105,7 +1115,7 @@ class _PrescriptionDrugResultCardState extends State<_PrescriptionDrugResultCard
                       ),
                       if (rxnorm['name'] != null)
                         Text(
-                          rxnorm['name'],
+                          rxnorm['name'].toString(),
                           style: const TextStyle(
                             fontSize: 12,
                             color: AppTheme.textSecondary,
@@ -1119,7 +1129,7 @@ class _PrescriptionDrugResultCardState extends State<_PrescriptionDrugResultCard
           ),
 
           // Detail Kandungan & Info Medis Lokal (Langsung Tampil di bawah nama)
-          if (localDrugs.isNotEmpty) ...[
+          if (localDrug != null) ...[
             const Divider(height: 1),
             Padding(
               padding: const EdgeInsets.all(12),
@@ -1136,7 +1146,7 @@ class _PrescriptionDrugResultCardState extends State<_PrescriptionDrugResultCard
                       ),
                       Expanded(
                         child: Text(
-                          localDrugs.first['genericName'] ?? localDrugs.first['activeIngredient'] ?? '-',
+                          localDrug['genericName']?.toString() ?? localDrug['activeIngredient']?.toString() ?? '-',
                           style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                         ),
                       ),
@@ -1145,56 +1155,56 @@ class _PrescriptionDrugResultCardState extends State<_PrescriptionDrugResultCard
                   const SizedBox(height: 8),
                   
                   // Kegunaan Utama
-                  if (localDrugs.first['fdaIndications'] != null || localDrugs.first['description'] != null) ...[
+                  if (localDrug['fdaIndications'] != null || localDrug['description'] != null) ...[
                     const Text(
                       'Kegunaan Utama / Indikasi:',
                       style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: AppTheme.success),
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      localDrugs.first['fdaIndications'] ?? localDrugs.first['description'],
+                      (localDrug['fdaIndications'] ?? localDrug['description']).toString(),
                       style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
                     ),
                     const SizedBox(height: 8),
                   ],
 
                   // Aturan Dosis / Cara Kerja
-                  if (localDrugs.first['fdaDosage'] != null) ...[
+                  if (localDrug['fdaDosage'] != null) ...[
                     const Text(
                       'Aturan Dosis & Cara Kerja:',
                       style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: AppTheme.primary),
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      localDrugs.first['fdaDosage'],
+                      localDrug['fdaDosage'].toString(),
                       style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
                     ),
                     const SizedBox(height: 8),
                   ],
 
                   // Efek Samping
-                  if (localDrugs.first['fdaSideEffects'] != null) ...[
+                  if (localDrug['fdaSideEffects'] != null) ...[
                     const Text(
                       'Efek Samping:',
                       style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: AppTheme.danger),
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      localDrugs.first['fdaSideEffects'],
+                      localDrug['fdaSideEffects'].toString(),
                       style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
                     ),
                     const SizedBox(height: 8),
                   ],
 
                   // Informasi Penting Penggunaan
-                  if (localDrugs.first['fdaWarnings'] != null) ...[
+                  if (localDrug['fdaWarnings'] != null) ...[
                     const Text(
                       'Informasi Penting Penggunaan:',
                       style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: AppTheme.warning),
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      localDrugs.first['fdaWarnings'],
+                      localDrug['fdaWarnings'].toString(),
                       style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
                     ),
                   ],
@@ -1204,7 +1214,7 @@ class _PrescriptionDrugResultCardState extends State<_PrescriptionDrugResultCard
           ],
 
           // Info FDA (Jika tidak ada info lokal, tampilkan info FDA sebagai cadangan)
-          if (localDrugs.isEmpty && _fdaInfo != null) ...[
+          if (localDrug == null && _fdaInfo != null) ...[
             const Divider(height: 1),
             Padding(
               padding: const EdgeInsets.all(12),
@@ -1222,7 +1232,7 @@ class _PrescriptionDrugResultCardState extends State<_PrescriptionDrugResultCard
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      _fdaInfo!['indications'],
+                      _fdaInfo!['indications'].toString(),
                       style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
                       maxLines: 3,
                       overflow: TextOverflow.ellipsis,
@@ -1240,7 +1250,7 @@ class _PrescriptionDrugResultCardState extends State<_PrescriptionDrugResultCard
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      _fdaInfo!['sideEffects'],
+                      _fdaInfo!['sideEffects'].toString(),
                       style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
                       maxLines: 3,
                       overflow: TextOverflow.ellipsis,
