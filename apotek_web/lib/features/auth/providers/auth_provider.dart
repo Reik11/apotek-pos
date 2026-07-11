@@ -41,7 +41,11 @@ class AuthState {
 // Auth Notifier
 class AuthNotifier extends StateNotifier<AuthState> {
   final Dio _dio = ApiClient.createDio();
-  final FlutterSecureStorage _storage = const FlutterSecureStorage();
+  final FlutterSecureStorage _storage = const FlutterSecureStorage(
+    aOptions: AndroidOptions(
+      encryptedSharedPreferences: true,
+    ),
+  );
 
   AuthNotifier() : super(AuthState()) {
     _checkToken();
@@ -66,6 +70,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
         state = state.copyWith(isInitialized: true);
       }
     } catch (e) {
+      // Jika terjadi error dekripsi (misal: karena reinstall/pemulihan backup Android Keystore yang tidak valid),
+      // kita bersihkan storage agar app pulih dan tidak stuck/hang.
+      try {
+        await _storage.deleteAll().timeout(const Duration(seconds: 1));
+      } catch (_) {}
       state = state.copyWith(isInitialized: true);
     }
   }
@@ -97,9 +106,20 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final token = response.data['accessToken'];
       final user = UserModel.fromJson(response.data['user']);
 
-      // Simpan token & data user
-      await _storage.write(key: 'access_token', value: token);
-      await _storage.write(key: 'user_data', value: jsonEncode(user.toJson()));
+      // Simpan token & data user secara aman dengan try-catch agar jika Keystore stuck tidak hang
+      try {
+        await _storage.write(key: 'access_token', value: token).timeout(const Duration(seconds: 2));
+        await _storage.write(key: 'user_data', value: jsonEncode(user.toJson())).timeout(const Duration(seconds: 2));
+      } catch (storageError) {
+        // Jika gagal karena isu Android Keystore, reset data tersimpan dan coba sekali lagi
+        try {
+          await _storage.deleteAll().timeout(const Duration(seconds: 1));
+          await _storage.write(key: 'access_token', value: token).timeout(const Duration(seconds: 2));
+          await _storage.write(key: 'user_data', value: jsonEncode(user.toJson())).timeout(const Duration(seconds: 2));
+        } catch (_) {
+          // Jika masih gagal (misal Keystore rusak total), biarkan user masuk di session ini saja
+        }
+      }
 
       state = state.copyWith(isLoading: false, user: user, token: token);
       return true;

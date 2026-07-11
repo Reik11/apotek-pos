@@ -32,7 +32,11 @@ class OutletsState {
 
 class OutletsNotifier extends StateNotifier<OutletsState> {
   final Dio _dio = ApiClient.createDio();
-  final FlutterSecureStorage _storage = const FlutterSecureStorage();
+  final FlutterSecureStorage _storage = const FlutterSecureStorage(
+    aOptions: AndroidOptions(
+      encryptedSharedPreferences: true,
+    ),
+  );
 
   OutletsNotifier() : super(OutletsState()) {
     loadOutlets();
@@ -41,23 +45,27 @@ class OutletsNotifier extends StateNotifier<OutletsState> {
 
   // Load selected outlet from secure storage
   Future<void> _loadSelectedOutlet() async {
-    final outletId = await _storage.read(key: 'selected_outlet_id');
-    final outletName = await _storage.read(key: 'selected_outlet_name');
-    if (outletId != null && outletName != null) {
-      state = state.copyWith(
-        selectedOutlet: {
-          'id': outletId,
-          'name': outletName,
-        },
-      );
-    }
+    try {
+      final outletId = await _storage.read(key: 'selected_outlet_id').timeout(const Duration(seconds: 1));
+      final outletName = await _storage.read(key: 'selected_outlet_name').timeout(const Duration(seconds: 1));
+      if (outletId != null && outletName != null) {
+        state = state.copyWith(
+          selectedOutlet: {
+            'id': outletId,
+            'name': outletName,
+          },
+        );
+      }
+    } catch (_) {}
   }
 
   // Select outlet for patient
   Future<void> selectOutlet(Map<String, dynamic>? outlet) async {
     if (outlet == null) {
-      await _storage.delete(key: 'selected_outlet_id');
-      await _storage.delete(key: 'selected_outlet_name');
+      try {
+        await _storage.delete(key: 'selected_outlet_id').timeout(const Duration(seconds: 1));
+        await _storage.delete(key: 'selected_outlet_name').timeout(const Duration(seconds: 1));
+      } catch (_) {}
       state = OutletsState(
         outlets: state.outlets,
         selectedOutlet: null,
@@ -65,8 +73,10 @@ class OutletsNotifier extends StateNotifier<OutletsState> {
         error: state.error,
       );
     } else {
-      await _storage.write(key: 'selected_outlet_id', value: outlet['id']);
-      await _storage.write(key: 'selected_outlet_name', value: outlet['name']);
+      try {
+        await _storage.write(key: 'selected_outlet_id', value: outlet['id']).timeout(const Duration(seconds: 2));
+        await _storage.write(key: 'selected_outlet_name', value: outlet['name']).timeout(const Duration(seconds: 2));
+      } catch (_) {}
       state = state.copyWith(selectedOutlet: outlet);
     }
   }
