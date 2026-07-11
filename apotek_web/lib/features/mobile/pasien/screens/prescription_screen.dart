@@ -1040,8 +1040,13 @@ class _PrescriptionDrugResultCard extends StatefulWidget {
 }
 
 class _PrescriptionDrugResultCardState extends State<_PrescriptionDrugResultCard> {
-  bool _showDetails = false;
   Map<String, dynamic>? _fdaInfo;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFdaInfo();
+  }
 
   Future<void> _loadFdaInfo() async {
     try {
@@ -1109,70 +1114,142 @@ class _PrescriptionDrugResultCardState extends State<_PrescriptionDrugResultCard
                     ],
                   ),
                 ),
-                IconButton(
-                  icon: Icon(
-                    _showDetails
-                        ? Icons.keyboard_arrow_up
-                        : Icons.keyboard_arrow_down,
-                  ),
-                  onPressed: () {
-                    setState(() => _showDetails = !_showDetails);
-                    if (_showDetails && _fdaInfo == null) {
-                      _loadFdaInfo();
-                    }
-                  },
-                ),
               ],
             ),
           ),
 
-          // Detail info
-          if (_showDetails) ...[
+          // Detail Kandungan & Info Medis Lokal (Langsung Tampil di bawah nama)
+          if (localDrugs.isNotEmpty) ...[
             const Divider(height: 1),
-
-            // Info FDA
-            if (_fdaInfo != null)
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (_fdaInfo!['indications'] != null) ...[
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Kandungan Aktif
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       const Text(
-                        'Indikasi:',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
-                          color: AppTheme.primary,
+                        'Kandungan Aktif: ',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppTheme.primary),
+                      ),
+                      Expanded(
+                        child: Text(
+                          localDrugs.first['genericName'] ?? localDrugs.first['activeIngredient'] ?? '-',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                         ),
                       ),
-                      Text(
-                        _fdaInfo!['indications'],
-                        style: const TextStyle(fontSize: 12),
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 8),
                     ],
-                    if (_fdaInfo!['sideEffects'] != null) ...[
-                      const Text(
-                        'Efek Samping:',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
-                          color: AppTheme.danger,
-                        ),
-                      ),
-                      Text(
-                        _fdaInfo!['sideEffects'],
-                        style: const TextStyle(fontSize: 12),
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  
+                  // Kegunaan Utama
+                  if (localDrugs.first['fdaIndications'] != null || localDrugs.first['description'] != null) ...[
+                    const Text(
+                      'Kegunaan Utama / Indikasi:',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: AppTheme.success),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      localDrugs.first['fdaIndications'] ?? localDrugs.first['description'],
+                      style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                    ),
+                    const SizedBox(height: 8),
                   ],
-                ),
+
+                  // Aturan Dosis / Cara Kerja
+                  if (localDrugs.first['fdaDosage'] != null) ...[
+                    const Text(
+                      'Aturan Dosis & Cara Kerja:',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: AppTheme.primary),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      localDrugs.first['fdaDosage'],
+                      style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+
+                  // Efek Samping
+                  if (localDrugs.first['fdaSideEffects'] != null) ...[
+                    const Text(
+                      'Efek Samping:',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: AppTheme.danger),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      localDrugs.first['fdaSideEffects'],
+                      style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+
+                  // Informasi Penting Penggunaan
+                  if (localDrugs.first['fdaWarnings'] != null) ...[
+                    const Text(
+                      'Informasi Penting Penggunaan:',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: AppTheme.warning),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      localDrugs.first['fdaWarnings'],
+                      style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                    ),
+                  ],
+                ],
               ),
+            ),
+          ],
+
+          // Info FDA (Jika tidak ada info lokal, tampilkan info FDA sebagai cadangan)
+          if (localDrugs.isEmpty && _fdaInfo != null) ...[
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (_fdaInfo!['indications'] != null) ...[
+                    const Text(
+                      'Indikasi (FDA):',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 11,
+                        color: AppTheme.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _fdaInfo!['indications'],
+                      style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  if (_fdaInfo!['sideEffects'] != null) ...[
+                    const Text(
+                      'Efek Samping (FDA):',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 11,
+                        color: AppTheme.danger,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _fdaInfo!['sideEffects'],
+                      style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
 
             // Tersedia di apotek ini
             if (localDrugs.isNotEmpty) ...[
