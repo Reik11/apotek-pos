@@ -181,7 +181,7 @@ export class UsersService {
     await this.prisma.activityLog.deleteMany({ where: { userId: id } });
     await this.prisma.address.deleteMany({ where: { userId: id } });
     await this.prisma.ocrScan.deleteMany({ where: { userId: id } });
-    await this.prisma.prescription.deleteMany({ where: { userId: id } });
+    await this.prisma.prescription.deleteMany({ where: { patientId: id } });
     await this.prisma.userReport.deleteMany({ where: { userId: id } });
 
     // 2. Hapus detail order & order pasien
