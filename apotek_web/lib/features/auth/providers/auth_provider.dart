@@ -66,6 +66,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
           token: token,
           isInitialized: true,
         );
+        ApiClient.activeToken = token;
       } else {
         state = state.copyWith(isInitialized: true);
       }
@@ -122,6 +123,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       }
 
       state = state.copyWith(isLoading: false, user: user, token: token);
+      ApiClient.activeToken = token;
       return true;
     } on DioException catch (e) {
       final message = _parseError(e, 'Koneksi ke server gagal atau salah password.');
@@ -173,6 +175,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       await _storage.write(key: 'user_data', value: jsonEncode(user.toJson()));
       
       state = state.copyWith(isLoading: false, user: user, token: token);
+      ApiClient.activeToken = token;
       return true;
     } on DioException catch (e) {
       final message = _parseError(e, 'Pendaftaran gagal. Cek kembali kode OTP Anda.');
@@ -207,6 +210,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   // LOGOUT
   Future<void> logout() async {
     await _storage.deleteAll();
+    ApiClient.activeToken = null;
     state = AuthState(isInitialized: true);
   }
 
@@ -263,6 +267,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       await _storage.write(key: 'user_data', value: jsonEncode(user.toJson()));
 
       state = state.copyWith(isLoading: false, user: user, token: token);
+      ApiClient.activeToken = token;
       return true;
     } on DioException catch (e) {
       final message = _parseError(e, 'Gagal masuk menggunakan Google.');

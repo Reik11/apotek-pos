@@ -3,6 +3,8 @@ import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class ApiClient {
+  static String? activeToken;
+
   // Otomatis pilih URL berdasarkan platform
   static String get baseUrl {
     if (kIsWeb) {
@@ -38,19 +40,21 @@ class ApiClient {
     dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
-          String? activeToken = token;
-          if (activeToken == null) {
+          String? currentToken = token ?? activeToken;
+          if (currentToken == null) {
             try {
-              activeToken = await _storage.read(key: 'access_token').timeout(const Duration(seconds: 1));
+              currentToken = await _storage.read(key: 'access_token').timeout(const Duration(seconds: 1));
+              activeToken = currentToken; // Simpan di memori agar cepat
             } catch (_) {}
           }
-          if (activeToken != null) {
-            options.headers['Authorization'] = 'Bearer $activeToken';
+          if (currentToken != null) {
+            options.headers['Authorization'] = 'Bearer $currentToken';
           }
           return handler.next(options);
         },
         onError: (error, handler) async {
           if (error.response?.statusCode == 401) {
+            activeToken = null;
             try {
               await _storage.delete(key: 'access_token').timeout(const Duration(seconds: 1));
             } catch (_) {}
