@@ -21,3 +21,11 @@ final topSellingDrugsProvider = FutureProvider<List<dynamic>>((ref) async {
   final response = await dio.get('/external/top-selling');
   return response.data as List? ?? [];
 });
+
+// Provider log aktivitas user (Audit Trail)
+final activityLogsProvider = FutureProvider<Map<String, dynamic>>((ref) async {
+  final dio = ApiClient.createDio();
+  final response = await dio.get('/activity-logs?limit=100&page=1');
+  return response.data as Map<String, dynamic>? ?? {'logs': [], 'meta': {}};
+});
+

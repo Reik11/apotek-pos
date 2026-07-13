@@ -16,6 +16,9 @@ import { SuppliersModule } from './modules/suppliers/suppliers.module';
 import { PurchaseOrdersModule } from './modules/purchase-orders/purchase-orders.module';
 import { ShiftsModule } from './modules/shifts/shifts.module';
 import { OutletsModule } from './modules/outlets/outlets.module';
+import { ActivityLogsModule } from './modules/activity-logs/activity-logs.module';
+import { APP_INTERCEPTOR } from '@nestjs/core';
+import { ActivityLogInterceptor } from './common/interceptors/activity-log.interceptor';
 
 @Module({
   imports: [
@@ -36,6 +39,13 @@ import { OutletsModule } from './modules/outlets/outlets.module';
     PurchaseOrdersModule,
     ShiftsModule,
     OutletsModule,
+    ActivityLogsModule,
+  ],
+  providers: [
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: ActivityLogInterceptor,
+    },
   ],
 })
-export class AppModule {}
+export class AppModule {}

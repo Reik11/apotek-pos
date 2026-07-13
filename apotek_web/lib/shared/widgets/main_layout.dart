@@ -188,6 +188,11 @@ class MainLayout extends ConsumerWidget {
           label: 'Outlet',
           route: '/outlets',
           roles: ['SUPER_ADMIN']),
+      _NavItem(
+          icon: Icons.assignment_rounded,
+          label: 'Log Aktivitas',
+          route: '/activity-logs',
+          roles: ['SUPER_ADMIN', 'ADMIN']),
     ];
 
     final userRole = user?.role as String?;

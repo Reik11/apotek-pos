@@ -16,6 +16,7 @@ import '../../features/reports/screens/reports_screen.dart';
 import '../../features/reports/screens/user_reports_screen.dart';
 import '../../features/reports/screens/system_sync_screen.dart';
 import '../../features/reports/screens/analytics_dashboard_screen.dart';
+import '../../features/reports/screens/activity_logs_screen.dart';
 import '../../features/users/screens/users_screen.dart';
 import '../../features/suppliers/screens/suppliers_screen.dart';
 import '../../features/purchase_orders/screens/purchase_orders_screen.dart';
@@ -74,6 +75,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             state.matchedLocation == '/profile' ||
             state.matchedLocation == '/system-sync' ||
             state.matchedLocation == '/analytics' ||
+            state.matchedLocation == '/activity-logs' ||
             state.matchedLocation == '/outlets';
 
         if (isWebRoute && role == 'PASIEN') {
@@ -165,6 +167,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/outlets',
             pageBuilder: (context, state) => _fadeTransitionPage(state, const OutletsScreen()),
+          ),
+          GoRoute(
+            path: '/activity-logs',
+            pageBuilder: (context, state) => _fadeTransitionPage(state, const ActivityLogsScreen()),
           ),
         ],
       ),

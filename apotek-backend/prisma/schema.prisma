@@ -49,6 +49,7 @@ model User {
   prescriptions Prescription[]
   reports       UserReport[]
   shifts        CashShift[]
+  activityLogs  ActivityLog[]
 }
 
 
@@ -480,4 +481,17 @@ model SyncLog {
   completedAt        DateTime?
   triggeredBy        String    // Nama pengguna / "SYSTEM" (Jika Scheduler)
   errorMessage       String?
+}
+
+// ==================
+// LOG AKTIVITAS USER (AUDIT TRAIL)
+// ==================
+model ActivityLog {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  action    String
+  details   String?
+  ipAddress String?
+  createdAt DateTime @default(now())
 }

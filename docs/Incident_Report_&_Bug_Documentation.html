@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Incident Report & Bug Documentation - Apotek POS (Medika)</title>
+    <style>
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            line-height: 1.6;
+            color: #333333;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            background-color: #ffffff;
+        }
+        h1 {
+            color: #0b57d0;
+            border-bottom: 2px solid #0b57d0;
+            padding-bottom: 8px;
+            font-size: 24pt;
+            margin-top: 0;
+        }
+        h2 {
+            color: #1f1f1f;
+            border-bottom: 1px solid #e0e0e0;
+            padding-bottom: 6px;
+            font-size: 18pt;
+            margin-top: 30px;
+        }
+        h3 {
+            color: #444746;
+            font-size: 14pt;
+            margin-top: 24px;
+        }
+        h4 {
+            color: #5f6368;
+            font-size: 12pt;
+            margin-top: 18px;
+            margin-bottom: 6px;
+        }
+        p, li {
+            font-size: 11pt;
+            margin-bottom: 10px;
+        }
+        ul, ol {
+            margin-top: 5px;
+            margin-bottom: 15px;
+            padding-left: 20px;
+        }
+        code {
+            font-family: Consolas, Monaco, "Andale Mono", monospace;
+            background-color: #f1f3f4;
+            padding: 2px 4px;
+            border-radius: 4px;
+            font-size: 10pt;
+        }
+        pre {
+            font-family: Consolas, Monaco, "Andale Mono", monospace;
+            background-color: #f8f9fa;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            padding: 12px;
+            overflow-x: auto;
+            font-size: 10pt;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .severity {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 9pt;
+            text-transform: uppercase;
+        }
+        .severity-critical {
+            background-color: #fce8e6;
+            color: #c5221f;
+            border: 1px solid #fad2cf;
+        }
+        .severity-high {
+            background-color: #fef7e0;
+            color: #b06000;
+            border: 1px solid #feebc8;
+        }
+        .severity-medium {
+            background-color: #e8f0fe;
+            color: #1a73e8;
+            border: 1px solid #d2e3fc;
+        }
+        .diff-delete {
+            background-color: #fce8e6;
+            color: #c5221f;
+            text-decoration: line-through;
+        }
+        .diff-add {
+            background-color: #e6f4ea;
+            color: #137333;
+        }
+        .info-box {
+            background-color: #f8f9fa;
+            border-left: 4px solid #0b57d0;
+            padding: 12px;
+            margin: 20px 0;
+        }
+        hr {
+            border: 0;
+            border-top: 1px solid #e0e0e0;
+            margin: 40px 0;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Laporan Insiden & Dokumentasi Bug: Apotek POS (Medika)</h1>
+    
+    <div class="info-box">
+        <strong>Petunjuk Salin-Tempel (Copy-Paste) ke Google Docs / MS Word:</strong><br>
+        1. Buka file HTML ini di browser Anda (Google Chrome, Edge, dll).<br>
+        2. Tekan <code>Ctrl + A</code> (pilih semua halaman) lalu <code>Ctrl + C</code> (salin).<br>
+        3. Buka dokumen Google Docs atau Microsoft Word kosong.<br>
+        4. Tekan <code>Ctrl + V</code> (tempel). Seluruh format teks, tabel, warna tingkat keparahan, dan blok kode akan otomatis terformat dengan rapi.
+    </div>
+
+    <h2>1. Template Incident Report (Laporan Insiden)</h2>
+    <p>Gunakan format laporan ini untuk mendokumentasikan insiden atau pemadaman sistem secara resmi.</p>
+    
+    <pre>
+<strong>🚨 LAPORAN INSIDEN: [Nama Insiden Singkat]</strong>
+
+<strong>Ringkasan Eksekutif</strong>
+* <strong>ID Insiden:</strong> INC-[YYYYMMDD]-[NOMOR_URUT]
+* <strong>Tanggal Kejadian:</strong> [DD/MM/YYYY]
+* <strong>Waktu Mulai:</strong> [HH:MM WIB]
+* <strong>Waktu Selesai:</strong> [HH:MM WIB] (atau "Dalam Penanganan")
+* <strong>Durasi:</strong> [Jam/Menit]
+* <strong>Dampak Bisnis:</strong> [Jelaskan fitur yang terganggu bagi pengguna]
+* <strong>Skala Keparahan (Severity):</strong> [Critical / High / Medium / Low]
+* <strong>Pemilik Masalah (Owner):</strong> [Nama Pengembang / Tim]
+
+<strong>Kronologi Kejadian (Timeline)</strong>
+* [HH:MM WIB] - Deteksi awal masalah melalui sistem/pengguna.
+* [HH:MM WIB] - Tim pengembang memulai investigasi awal.
+* [HH:MM WIB] - Akar penyebab (Root Cause) berhasil diidentifikasi.
+* [HH:MM WIB] - Perbaikan kode diterapkan ke server staging/produksi.
+* [HH:MM WIB] - Verifikasi selesai, sistem dinyatakan pulih sepenuhnya.
+
+<strong>Analisis Akar Masalah (Root Cause Analysis - RCA)</strong>
+[Deskripsikan penyebab teknis kegagalan sistem serta dampaknya secara rinci.]
+
+<strong>Tindakan Perbaikan (Corrective & Preventive Actions)</strong>
+1. <strong>Tindakan Langsung (Short-term Fix):</strong> [Langkah cepat mitigasi jangka pendek.]
+2. <strong>Tindakan Pencegahan (Long-term Prevention):</strong> [Tindakan jangka panjang agar error tidak terulang kembali.]
+    </pre>
+
+    <hr>
+
+    <h2>2. Template Bug Documentation (Dokumentasi Bug)</h2>
+    <p>Gunakan format dokumentasi ini untuk mencatat bug/cacat sistem yang ditemukan dari fase QA atau rilis.</p>
+
+    <pre>
+<strong>🐛 DOKUMENTASI BUG: [Judul Singkat Mengenai Error]</strong>
+
+<strong>Detail Bug</strong>
+* <strong>ID Bug:</strong> BUG-[NOMOR]
+* <strong>Komponen Terkait:</strong> [Mobile UI / Backend API / Database]
+* <strong>Skala Keparahan (Severity):</strong> [🔴 Critical / 🟠 High / 🟡 Medium / 🟢 Low]
+* <strong>Ditemukan Oleh:</strong> [Nama Penguji]
+* <strong>Ditemukan Pada Versi:</strong> [vX.Y.Z]
+
+<strong>Langkah untuk Mereproduksi (Steps to Reproduce)</strong>
+1. [Langkah 1]
+2. [Langkah 2]
+3. [Langkah 3]
+
+<strong>Ekspektasi vs Realita (Expected vs Actual Behavior)</strong>
+* <strong>Ekspektasi (Expected):</strong> [Apa yang seharusnya terjadi secara logika bisnis]
+* <strong>Realita (Actual):</strong> [Kenyataan error yang terjadi di layar/log]
+
+<strong>Solusi / Tambalan Kode (Resolution / Fix)</strong>
+* <strong>Penyebab Teknis:</strong> [Mengapa kode gagal secara logika]
+* <strong>Perubahan Kode:</strong>
+  [Gunakan tabel perbedaan atau deskripsi perubahan kode]
+* <strong>Status:</strong> [Teratasi / Masih Terbuka / Dalam Peninjauan]
+    </pre>
+
+    <hr>
+
+    <h2>3. Laporan Insiden & Dokumentasi Bug Hasil Analisis Kode</h2>
+    <p>Berikut adalah laporan insiden dan bug nyata yang berhasil ditarik dari hasil analisis kode dan foto-foto dari Google Play Store serta hasil uji OCR.</p>
+
+    <h3>🚨 Laporan Insiden: Kegagalan Rilis Aplikasi ke Google Play Store</h3>
+    <ul>
+        <li><strong>ID Insiden:</strong> INC-20260712-01</li>
+        <li><strong>Tanggal Kejadian:</strong> 12/07/2026</li>
+        <li><strong>Skala Keparahan (Severity):</strong> <span class="severity severity-critical">Critical</span></li>
+        <li><strong>Dampak Layanan:</strong> Aplikasi mobile Medika tidak dapat didistribusikan ke Google Play Store (proses rilis terhambat total).</li>
+        <li><strong>Analisis Akar Masalah (RCA):</strong>
+            <ul>
+                <li><strong>Masalah 1 (Debug Signature):</strong> Berkas bundle <code>app-release.aab</code> dibangun menggunakan tanda tangan debug default Flutter, yang ditolak otomatis oleh Google Play Console untuk alasan keamanan rilis.</li>
+                <li><strong>Masalah 2 (Package Name Mismatch):</strong> Konfigurasi <code>applicationId</code> pada file gradle masih berupa default <code>com.example.apotek_web</code>, sedangkan aplikasi terdaftar di Play Console dengan ID <code>com.hn.medika</code>.</li>
+            </ul>
+        </li>
+        <li><strong>Tindakan Perbaikan:</strong>
+            <ol>
+                <li>Membuat file keystore rilis aman (<code>upload-keystore.jks</code>) dan memetakan kredensial di <code>key.properties</code>.</li>
+                <li>Memperbarui konfigurasi Gradle untuk memproses penandatanganan rilis secara dinamis.</li>
+                <li>Mengubah <code>applicationId</code> serta memindahkan class <code>MainActivity.kt</code> ke package name yang sesuai (<code>com.hn.medika</code>).</li>
+            </ol>
+        </li>
+    </ul>
+
+    <hr>
+
+    <h3>🐛 Dokumentasi Bug yang Diketahui</h3>
+
+    <!-- BUG 1 -->
+    <h4>BUG-001: Penolakan Kunci Tanda Tangan Debug di Play Store</h4>
+    <ul>
+        <li><strong>Komponen Terkait:</strong> Android Build & Deployment</li>
+        <li><strong>Skala Keparahan (Severity):</strong> <span class="severity severity-critical">Critical</span></li>
+        <li><strong>Langkah untuk Mereproduksi:</strong>
+            <ol>
+                <li>Jalankan perintah <code>flutter build appbundle --release</code> di lokal.</li>
+                <li>Unggah berkas <code>app-release.aab</code> yang dihasilkan ke Google Play Console.</li>
+            </ol>
+        </li>
+        <li><strong>Ekspektasi vs Realita:</strong>
+            <ul>
+                <li><strong>Ekspektasi:</strong> Google Play Console berhasil menerima bundel aplikasi untuk didistribusikan ke pengguna.</li>
+                <li><strong>Realita:</strong> Google Play Console memunculkan galat bahwa file AAB ditandatangani menggunakan sertifikat pengujian (debug mode).</li>
+            </ul>
+        </li>
+        <li><strong>Solusi / Perubahan Kode:</strong>
+            <p>Membuat berkas <code>key.properties</code> untuk menyimpan kredensial rilis dan mengubah <code>build.gradle.kts</code>:</p>
+            <pre>
+signingConfigs {
+    create("release") {
+        keyAlias = properties["keyAlias"] as String
+        keyPassword = properties["keyPassword"] as String
+        storeFile = file(properties["storeFile"] as String)
+        storePassword = properties["storePassword"] as String
+    }
+}
+buildTypes {
+    release {
+        signingConfig = signingConfigs.getByName("release")
+    }
+}</pre>
+    </li>
+    </ul>
+
+    <!-- BUG 2 -->
+    <h4>BUG-002: Ketidakcocokan Nama Paket (Application ID)</h4>
+    <ul>
+        <li><strong>Komponen Terkait:</strong> Android Manifest / Build Configuration</li>
+        <li><strong>Skala Keparahan (Severity):</strong> <span class="severity severity-critical">Critical</span></li>
+        <li><strong>Langkah untuk Mereproduksi:</strong>
+            <ol>
+                <li>Bangun berkas rilis AAB bertandatangan.</li>
+                <li>Coba unggah ke dalam aplikasi Google Play Console milik <code>com.hn.medika</code>.</li>
+            </ol>
+        </li>
+        <li><strong>Ekspektasi vs Realita:</strong>
+            <ul>
+                <li><strong>Ekspektasi:</strong> ID paket cocok dan proses pengunggahan berhasil.</li>
+                <li><strong>Realita:</strong> Terjadi penolakan dengan pesan galat: <em>"APK atau Android App Bundle Anda harus memiliki nama paket com.hn.medika."</em></li>
+            </ul>
+        </li>
+        <li><strong>Solusi / Perubahan Kode:</strong>
+            <p>Ubah penamaan namespace dan applicationId di file <code>android/app/build.gradle.kts</code>:</p>
+            <pre>
+<span class="diff-delete">- namespace = "com.example.apotek_web"</span>
+<span class="diff-delete">- applicationId = "com.example.apotek_web"</span>
+<span class="diff-add">+ namespace = "com.hn.medika"</span>
+<span class="diff-add">+ applicationId = "com.hn.medika"</span></pre>
+            <p>Latu sesuaikan baris pertama <code>MainActivity.kt</code> menjadi <code>package com.hn.medika</code>.</p>
+        </li>
+    </ul>
+
+    <!-- BUG 3 -->
+    <h4>BUG-003: Fitur Scan OCR Resep Gagal Membaca Tulisan Tangan (Silent Failure)</h4>
+    <ul>
+        <li><strong>Komponen Terkait:</strong> Mobile OCR & UX</li>
+        <li><strong>Skala Keparahan (Severity):</strong> <span class="severity severity-high">High</span></li>
+        <li><strong>Langkah untuk Mereproduksi:</strong>
+            <ol>
+                <li>Buka fitur unggah resep dokter di aplikasi mobile pasien.</li>
+                <li>Pilih gambar resep dokter dengan tulisan tangan sambung/miring (seperti teks "Zitoma" / "Azitoma").</li>
+                <li>Klik tombol <strong>Scan & Proses Resep</strong>.</li>
+            </ol>
+        </li>
+        <li><strong>Ekspektasi vs Realita:</strong>
+            <ul>
+                <li><strong>Ekspektasi:</strong> Hasil pindaian obat ditampilkan secara akurat di layar, atau aplikasi memberikan feedback berupa notifikasi SnackBar jika teks tidak terbaca sama sekali.</li>
+                <li><strong>Realita:</strong> Indikator loading berputar sejenak lalu menghilang tanpa ada pesan kesalahan maupun hasil teks yang keluar (silent failure).</li>
+            </ul>
+        </li>
+        <li><strong>Solusi / Perubahan Kode:</strong>
+            <p>Menghapus pustaka lokal ML Kit (yang dirancang hanya untuk teks cetak) dan memindahkan logika OCR resep ke endpoint backend <code>/external/ocr-prescription</code> yang memproses model ONNX terlatih (<code>ocr_prescription_model.onnx</code>) dengan koreksi Levenshtein Distance.</p>
+            <p>Menambahkan SnackBar feedback di sisi mobile:</p>
+            <pre>
+if (ocrResult.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Resep tulisan tangan tidak dapat dibaca. Silakan foto kembali resep Anda secara tegak dan jelas.')),
+    );
+}</pre>
+        </li>
+    </ul>
+
+    <!-- BUG 4 -->
+    <h4>BUG-004: Kegagalan Kompilasi Kotlin di Windows (Drive Root Mismatch)</h4>
+    <ul>
+        <li><strong>Komponen Terkait:</strong> Local Developer Environment (Build Tooling)</li>
+        <li><strong>Skala Keparahan (Severity):</strong> <span class="severity severity-high">High</span></li>
+        <li><strong>Langkah untuk Mereproduksi:</strong>
+            <ol>
+                <li>Simpan direktori proyek di Drive <code>D:\</code> pada sistem operasi Windows.</li>
+                <li>Pastikan folder cache pub berada di default <code>C:\Users\...</code>.</li>
+                <li>Jalankan <code>flutter build appbundle</code> dari terminal proyek.</li>
+            </ol>
+        </li>
+        <li><strong>Ekspektasi vs Realita:</strong>
+            <ul>
+                <li><strong>Ekspektasi:</strong> Aplikasi terkompilasi dengan lancar.</li>
+                <li><strong>Realita:</strong> Build gagal dengan galat fatal: <code>IllegalArgumentException: this and base files have different roots</code> dari kompiler Kotlin saat mengompilasi berkas <code>image_picker_android</code>.</li>
+            </ul>
+        </li>
+        <li><strong>Solusi / Perubahan Kode:</strong>
+            <p>Menghapus pustaka native yang tidak lagi digunakan (<code>google_mlkit_text_recognition</code>) karena OCR telah didelegasikan ke backend. Masalah cross-drive compiler dapat dihindari dengan memindahkan sementara folder proyek ke Drive <code>C:\</code> atau mengatur ulang environment variable cache pub agar seragam di Drive <code>D:\`</code>.</p>
+        </li>
+    </ul>
+
+    <!-- BUG 5 -->
+    <h4>BUG-005: Hang Tanpa Batas Saat Login di HP Samsung (Keystore Cloud Restore Bug)</h4>
+    <ul>
+        <li><strong>Komponen Terkait:</strong> Authentication & Secure Storage</li>
+        <li><strong>Skala Keparahan (Severity):</strong> <span class="severity severity-critical">Critical</span></li>
+        <li><strong>Langkah untuk Mereproduksi:</strong>
+            <ol>
+                <li>Pasang aplikasi di HP Samsung, jalankan login, dan biarkan sistem mencadangkan data ke cloud Samsung/Knox.</li>
+                <li>Lakukan uninstal aplikasi.</li>
+                <li>Unduh kembali aplikasi dari cloud backup, pasang ulang, lalu buka aplikasi dan coba login kembali.</li>
+            </ol>
+        </li>
+        <li><strong>Ekspektasi vs Realita:</strong>
+            <ul>
+                <li><strong>Ekspektasi:</strong> Token lama terhapus bersih secara otomatis, aplikasi membuka halaman login bersih.</li>
+                <li><strong>Realita:</strong> Aplikasi terkunci di splash screen/halaman login berputar selamanya karena data token lama berhasil dipulihkan secara otomatis oleh cloud, tetapi kunci dekripsi Keystore yang digunakan untuk membacanya telah dihancurkan oleh sistem saat uninstal, memicu deadlock thread.</li>
+            </ul>
+        </li>
+        <li><strong>Solusi / Perubahan Kode:</strong>
+            <p>Aktifkan parameter <code>encryptedSharedPreferences</code> pada modul secure storage Android, serta terapkan timeout dan catch blok untuk meriset penyimpanan (self-healing):</p>
+            <pre>
+try {
+    final token = await secureStorage.read(key: 'auth_token').timeout(Duration(seconds: 2));
+} catch (e) {
+    // Hapus total data secure storage yang korup/tidak bisa didekripsi
+    await secureStorage.deleteAll();
+}</pre>
+        </li>
+    </ul>
+
+    <!-- BUG 6 -->
+    <h4>BUG-006: PlatformException (Channel Error) Kamera di Versi Mobile Rilis</h4>
+    <ul>
+        <li><strong>Komponen Terkait:</strong> Flutter Platform Channel (Native Bindings)</li>
+        <li><strong>Skala Keparahan (Severity):</strong> <span class="severity severity-high">High</span></li>
+        <li><strong>Langkah untuk Mereproduksi:</strong>
+            <ol>
+                <li>Bangun rilis APK dan instal di ponsel fisik.</li>
+                <li>Buka menu unggah resep, lalu tekan tombol memicu kamera.</li>
+            </ol>
+        </li>
+        <li><strong>Ekspektasi vs Realita:</strong>
+            <ul>
+                <li><strong>Ekspektasi:</strong> Kamera internal ponsel terbuka secara responsif.</li>
+                <li><strong>Realita:</strong> Aplikasi crash seketika dan melempar kesalahan: <code>PlatformException(channel-error, ...)</code>.</li>
+            </ul>
+        </li>
+        <li><strong>Solusi / Perubahan Kode:</strong>
+            <p>Memindahkan library native (<code>image_picker</code>, <code>permission_handler</code>) dari bagian <code>dev_dependencies</code> ke <code>dependencies</code> utama pada file <code>pubspec.yaml</code> agar modul native bindings terdaftar dengan tepat ke dalam struktur build APK rilis.</p>
+        </li>
+    </ul>
+
+</body>
+</html>

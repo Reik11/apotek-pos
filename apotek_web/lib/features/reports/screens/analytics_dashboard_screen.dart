@@ -4,6 +4,7 @@ import 'package:fl_chart/fl_chart.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/main_layout.dart';
 import '../providers/sync_provider.dart';
+import '../providers/reports_provider.dart';
 
 class AnalyticsDashboardScreen extends ConsumerWidget {
   const AnalyticsDashboardScreen({super.key});
@@ -12,6 +13,7 @@ class AnalyticsDashboardScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final trendsAsync = ref.watch(epidemiologyTrendsProvider);
     final topSellingAsync = ref.watch(topSellingDrugsProvider);
+    final recallsAsync = ref.watch(fdaRecallsProvider);
 
     return MainLayout(
       currentRoute: '/analytics',
@@ -158,6 +160,54 @@ class AnalyticsDashboardScreen extends ConsumerWidget {
                                 );
                               }
                               return _buildTopSellingBarChart(items);
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+
+            // ===== GLOBAL SAFETY TRENDS ROW (2nd External Visualization) =====
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Container(
+                    height: 380,
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: AppTheme.shadowSubtle,
+                      border: Border.all(color: Colors.grey.shade100),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Tingkat Keamanan Obat Global (FDA Recall)',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                        ),
+                        const Text(
+                          'Distribusi bahaya keamanan obat berdasarkan klasifikasi kelas openFDA (Proporsi % & Volume)',
+                          style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                        ),
+                        const SizedBox(height: 24),
+                        Expanded(
+                          child: recallsAsync.when(
+                            loading: () => const Center(child: CircularProgressIndicator()),
+                            error: (e, _) => Center(child: Text('Gagal memuat recalls: $e')),
+                            data: (recalls) {
+                              if (recalls.isEmpty) {
+                                return const Center(
+                                  child: Text('Tidak ada data recall obat FDA terbaru.', style: TextStyle(color: AppTheme.textSecondary)),
+                                );
+                              }
+                              return _buildFdaRecallPieChart(recalls);
                             },
                           ),
                         ),
@@ -485,6 +535,87 @@ class AnalyticsDashboardScreen extends ConsumerWidget {
         ),
         const SizedBox(width: 6),
         Text(label, style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
+      ],
+    );
+  }
+
+  Widget _buildFdaRecallPieChart(List<dynamic> recalls) {
+    int class1 = 0;
+    int class2 = 0;
+    int class3 = 0;
+
+    for (var r in recalls) {
+      final classification = r['classification'] as String? ?? 'Class II';
+      if (classification.contains('Class I')) {
+        class1++;
+      } else if (classification.contains('Class III')) {
+        class3++;
+      } else {
+        class2++;
+      }
+    }
+
+    final total = class1 + class2 + class3;
+    if (total == 0) {
+      return const Center(child: Text('Tidak ada data klasifikasi'));
+    }
+
+    final class1Percent = (class1 / total * 100).toStringAsFixed(0);
+    final class2Percent = (class2 / total * 100).toStringAsFixed(0);
+    final class3Percent = (class3 / total * 100).toStringAsFixed(0);
+
+    return Row(
+      children: [
+        Expanded(
+          flex: 4,
+          child: PieChart(
+            PieChartData(
+              sectionsSpace: 4,
+              centerSpaceRadius: 40,
+              sections: [
+                if (class1 > 0)
+                  PieChartSectionData(
+                    value: class1.toDouble(),
+                    title: '$class1Percent%',
+                    color: AppTheme.danger,
+                    radius: 50,
+                    titleStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+                if (class2 > 0)
+                  PieChartSectionData(
+                    value: class2.toDouble(),
+                    title: '$class2Percent%',
+                    color: Colors.orange,
+                    radius: 50,
+                    titleStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+                if (class3 > 0)
+                  PieChartSectionData(
+                    value: class3.toDouble(),
+                    title: '$class3Percent%',
+                    color: AppTheme.success,
+                    radius: 50,
+                    titleStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 24),
+        Expanded(
+          flex: 4,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildLegendItem('Class I (Bahaya Tinggi: $class1)', AppTheme.danger),
+              const SizedBox(height: 12),
+              _buildLegendItem('Class II (Bahaya Sedang: $class2)', Colors.orange),
+              const SizedBox(height: 12),
+              _buildLegendItem('Class III (Bahaya Rendah: $class3)', AppTheme.success),
+            ],
+          ),
+        ),
       ],
     );
   }
