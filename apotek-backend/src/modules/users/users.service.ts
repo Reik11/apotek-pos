@@ -120,7 +120,10 @@ export class UsersService {
   async findAll(role?: string, outletId?: string) {
     const where: any = {};
     if (role !== 'SUPER_ADMIN' && outletId) {
-      where.outletId = outletId;
+      where.OR = [
+        { outletId },
+        { role: 'PASIEN' }
+      ];
     }
     return this.prisma.user.findMany({
       where,
