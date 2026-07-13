@@ -22,6 +22,7 @@ export class OrdersController {
       prescriptionId: body.prescriptionId,
       shippingFee: body.shippingFee,
       paymentMethod: body.paymentMethod,
+      paymentProof: body.paymentProof,
       outletId: body.outletId,
     });
   }

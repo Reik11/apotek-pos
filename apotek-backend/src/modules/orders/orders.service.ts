@@ -15,6 +15,7 @@ export class OrdersService {
     prescriptionId?: string;
     shippingFee?: number;
     paymentMethod?: string;
+    paymentProof?: string;
     outletId?: string;
   }) {
     // Validasi stok & hitung total
@@ -87,6 +88,7 @@ export class OrdersService {
         totalAmount,
         shippingFee,
         paymentMethod: data.paymentMethod || 'CASH',
+        paymentProof: data.paymentProof,
         orderCode,
         notes: data.notes,
         deliveryMethod: data.deliveryMethod || 'PICKUP',

@@ -583,7 +583,7 @@ class _PasienHomeScreenState extends ConsumerState<PasienHomeScreen> {
         return StatefulBuilder(
           builder: (ctx, setDialogState) => AlertDialog(
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: const Text('Pembayaran (Simulasi Midtrans)'),
+            title: const Text('Konfirmasi Pembayaran'),
             content: SizedBox(
               width: 400,
               child: Column(
@@ -621,17 +621,36 @@ class _PasienHomeScreenState extends ConsumerState<PasienHomeScreen> {
                     const Text('Silakan scan QRIS berikut:', style: TextStyle(fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
                     Center(
-                      child: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey.shade300),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Image.network(
-                          'https://api.dicebear.com/7.x/bottts/svg?seed=qris_mock',
-                          width: 120,
-                          height: 120,
-                        ),
+                      child: Column(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              border: Border.all(color: Colors.grey.shade300),
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.04),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Image.network(
+                              'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=00020101021226380010ID.CO.GEOPAY.WWW01189360000000000000005204541153033605802ID5917Apotek%20POS%20Medika6007Jakarta61051234',
+                              width: 160,
+                              height: 160,
+                              errorBuilder: (context, error, stackTrace) => const Icon(Icons.qr_code_2, size: 160, color: Colors.grey),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Scan dengan GoPay, OVO, Dana, LinkAja, atau Mobile Banking',
+                            style: TextStyle(fontSize: 10, color: AppTheme.textSecondary),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
                       ),
                     ),
                   ],
