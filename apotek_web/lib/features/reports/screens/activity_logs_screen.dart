@@ -24,7 +24,7 @@ class ActivityLogsScreen extends ConsumerWidget {
             children: [
               // ===== Header Section =====
               Row(
-                mainAxisAlignment: MainAxisAlignment.between,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
