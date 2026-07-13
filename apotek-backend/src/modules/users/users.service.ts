@@ -176,6 +176,32 @@ export class UsersService {
     if (id === requesterId) throw new ForbiddenException('Tidak bisa menghapus akun sendiri');
     const user = await this.prisma.user.findUnique({ where: { id } });
     if (!user) throw new NotFoundException('User tidak ditemukan');
+
+    // 1. Hapus data aktivitas & data pendukung pasien
+    await this.prisma.activityLog.deleteMany({ where: { userId: id } });
+    await this.prisma.address.deleteMany({ where: { userId: id } });
+    await this.prisma.ocrScan.deleteMany({ where: { userId: id } });
+    await this.prisma.prescription.deleteMany({ where: { userId: id } });
+    await this.prisma.userReport.deleteMany({ where: { userId: id } });
+
+    // 2. Hapus detail order & order pasien
+    const orders = await this.prisma.order.findMany({ where: { patientId: id } });
+    for (const order of orders) {
+      await this.prisma.orderItem.deleteMany({ where: { orderId: order.id } });
+    }
+    await this.prisma.order.deleteMany({ where: { patientId: id } });
+
+    // 3. Hapus detail transaksi & transaksi kasir
+    const txs = await this.prisma.transaction.findMany({ where: { cashierId: id } });
+    for (const tx of txs) {
+      await this.prisma.transactionItem.deleteMany({ where: { transactionId: tx.id } });
+    }
+    await this.prisma.transaction.deleteMany({ where: { cashierId: id } });
+
+    // 4. Hapus shift kasir
+    await this.prisma.cashShift.deleteMany({ where: { cashierId: id } });
+
+    // 5. Akhirnya hapus akun pengguna
     return this.prisma.user.delete({ where: { id } });
   }
 
