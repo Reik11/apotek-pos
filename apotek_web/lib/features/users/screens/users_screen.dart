@@ -18,6 +18,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
   String _selectedRoleFilter = 'SEMUA';
+  String _selectedOutletFilter = 'SEMUA';
   String _sortBy = 'NAME_ASC';
 
   static const _roles = ['ADMIN', 'APOTEKER', 'KASIR', 'PASIEN'];
@@ -53,6 +54,15 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
       // 2. Role filter
       if (_selectedRoleFilter != 'SEMUA') {
         if (u['role'] != _selectedRoleFilter) return false;
+      }
+
+      // 3. Outlet filter
+      if (_selectedOutletFilter != 'SEMUA') {
+        if (_selectedOutletFilter == 'GLOBAL') {
+          if (u['outletId'] != null) return false;
+        } else {
+          if (u['outletId'] != _selectedOutletFilter) return false;
+        }
       }
 
       return true;
@@ -124,7 +134,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
               children: [
                 // Search Input
                 Expanded(
-                  flex: 3,
+                  flex: 2,
                   child: TextField(
                     controller: _searchController,
                     decoration: const InputDecoration(
@@ -154,6 +164,29 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                     ],
                     onChanged: (v) {
                       if (v != null) setState(() => _selectedRoleFilter = v);
+                    },
+                  ),
+                ),
+                const SizedBox(width: 16),
+                // Outlet Filter Dropdown
+                Expanded(
+                  flex: 1,
+                  child: DropdownButtonFormField<String>(
+                    value: _selectedOutletFilter,
+                    decoration: const InputDecoration(
+                      labelText: 'Filter Outlet',
+                      prefixIcon: Icon(Icons.storefront_rounded),
+                    ),
+                    items: [
+                      const DropdownMenuItem(value: 'SEMUA', child: Text('Semua Outlet')),
+                      const DropdownMenuItem(value: 'GLOBAL', child: Text('Global / Pusat')),
+                      ...outletsState.outlets.map((o) => DropdownMenuItem(
+                            value: o['id'] as String? ?? '',
+                            child: Text(o['name'] ?? '-'),
+                          )),
+                    ],
+                    onChanged: (v) {
+                      if (v != null) setState(() => _selectedOutletFilter = v);
                     },
                   ),
                 ),
@@ -484,28 +517,28 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                     items: _shifts.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
                     onChanged: (v) => setS(() => selectedShift = v!),
                   ),
-                  if (ref.read(authProvider).user?.role == 'SUPER_ADMIN') ...[
-                    const SizedBox(height: 12),
-                    const Text('Outlet / Cabang', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                    const SizedBox(height: 6),
-                    DropdownButtonFormField<String?>(
-                      value: selectedOutletId,
-                      decoration: const InputDecoration(),
-                      items: [
-                        const DropdownMenuItem<String?>(
-                          value: null,
-                          child: Text('Global / Pusat'),
-                        ),
-                        ...outletsState.outlets.map(
-                          (o) => DropdownMenuItem<String?>(
-                            value: o['id'] as String?,
-                            child: Text(o['name'] ?? '-'),
+                  const SizedBox(height: 12),
+                  const Text('Outlet / Cabang', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                  const SizedBox(height: 6),
+                  DropdownButtonFormField<String?>(
+                    value: selectedOutletId,
+                    decoration: const InputDecoration(),
+                    items: [
+                      const DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text('Global / Pusat'),
+                      ),
+                      ...outletsState.outlets
+                          .where((o) => currentUser?.role == 'SUPER_ADMIN' || o['id'] == currentUser?.outletId)
+                          .map(
+                            (o) => DropdownMenuItem<String?>(
+                              value: o['id'] as String?,
+                              child: Text(o['name'] ?? '-'),
+                            ),
                           ),
-                        ),
-                      ],
-                      onChanged: (v) => setS(() => selectedOutletId = v),
-                    ),
-                  ],
+                    ],
+                    onChanged: (v) => setS(() => selectedOutletId = v),
+                  ),
                 ],
               ),
             ),
@@ -590,28 +623,28 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                     items: _shifts.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
                     onChanged: (v) => setS(() => selectedShift = v!),
                   ),
-                  if (ref.read(authProvider).user?.role == 'SUPER_ADMIN') ...[
-                    const SizedBox(height: 12),
-                    const Text('Outlet / Cabang', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                    const SizedBox(height: 6),
-                    DropdownButtonFormField<String?>(
-                      value: selectedOutletId,
-                      decoration: const InputDecoration(),
-                      items: [
-                        const DropdownMenuItem<String?>(
-                          value: null,
-                          child: Text('Global / Pusat'),
-                        ),
-                        ...outletsState.outlets.map(
-                          (o) => DropdownMenuItem<String?>(
-                            value: o['id'] as String?,
-                            child: Text(o['name'] ?? '-'),
+                  const SizedBox(height: 12),
+                  const Text('Outlet / Cabang', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                  const SizedBox(height: 6),
+                  DropdownButtonFormField<String?>(
+                    value: selectedOutletId,
+                    decoration: const InputDecoration(),
+                    items: [
+                      const DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text('Global / Pusat'),
+                      ),
+                      ...outletsState.outlets
+                          .where((o) => currentUser?.role == 'SUPER_ADMIN' || o['id'] == currentUser?.outletId)
+                          .map(
+                            (o) => DropdownMenuItem<String?>(
+                              value: o['id'] as String?,
+                              child: Text(o['name'] ?? '-'),
+                            ),
                           ),
-                        ),
-                      ],
-                      onChanged: (v) => setS(() => selectedOutletId = v),
-                    ),
-                  ],
+                    ],
+                    onChanged: (v) => setS(() => selectedOutletId = v),
+                  ),
                   const SizedBox(height: 12),
                   Row(
                     children: [
