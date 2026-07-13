@@ -529,7 +529,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                         child: Text('Global / Pusat'),
                       ),
                       ...outletsState.outlets
-                          .where((o) => currentUser?.role == 'SUPER_ADMIN' || o['id'] == currentUser?.outletId)
+                          .where((o) => ref.read(authProvider).user?.role == 'SUPER_ADMIN' || o['id'] == ref.read(authProvider).user?.outletId)
                           .map(
                             (o) => DropdownMenuItem<String?>(
                               value: o['id'] as String?,
@@ -635,7 +635,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                         child: Text('Global / Pusat'),
                       ),
                       ...outletsState.outlets
-                          .where((o) => currentUser?.role == 'SUPER_ADMIN' || o['id'] == currentUser?.outletId)
+                          .where((o) => ref.read(authProvider).user?.role == 'SUPER_ADMIN' || o['id'] == ref.read(authProvider).user?.outletId)
                           .map(
                             (o) => DropdownMenuItem<String?>(
                               value: o['id'] as String?,
