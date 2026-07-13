@@ -522,6 +522,8 @@ class _PasienHomeScreenState extends ConsumerState<PasienHomeScreen> {
                     border: InputBorder.none,
                     isDense: true,
                     contentPadding: EdgeInsets.zero,
+                    filled: false,
+                    fillColor: Colors.transparent,
                   ),
                 ),
               ),
